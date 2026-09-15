@@ -845,7 +845,7 @@ void DrumCloudUI::uiIdle()
             std::copy_n(result->preview.max, kWavePreviewSize, fWaveMax);
             fWaveValid = true;
             fLoadError = false;
-            fLoadStatus = result->chosen ? "FILE ACCEPTED - LOADING SAMPLE" : "SAMPLE PREVIEW READY";
+            fLoadStatus = result->chosen ? "FILE ACCEPTED" : "SAMPLE PREVIEW READY";
             if (result->chosen) setState("samplePath", fSamplePath.c_str());
         }
         else
