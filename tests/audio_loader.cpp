@@ -61,6 +61,12 @@ int main()
     assert(error.find("limit") != std::string::npos);
     assert(!loadAudioFilePreview("oversized.wav", preview, &error));
     assert(error.find("limit") != std::string::npos);
+    assert(loadAudioFilePreview("codec.flac", preview, &error));
+    assert(preview.channels == 2 && preview.frames > 40000);
+    assert(loadAudioFileToFloat("codec.flac", audio, &error));
+    assert(loadAudioFilePreview("codec.mp3", preview, &error));
+    assert(preview.channels == 2 && preview.frames > 40000);
+    assert(loadAudioFileToFloat("codec.mp3", audio, &error));
     assert(!loadAudioFileToFloat("missing.wav", audio, &error));
     {
         std::ofstream broken("broken.wav", std::ios::binary);
