@@ -1,0 +1,31 @@
+#ifndef DISTRHO_PLUGIN_INFO_H_INCLUDED
+#define DISTRHO_PLUGIN_INFO_H_INCLUDED
+
+#define DISTRHO_PLUGIN_BRAND   "Fuimadane"
+#define DISTRHO_PLUGIN_NAME    "DrumCloud"
+#define DISTRHO_PLUGIN_URI     "urn:fuimadane:drumcloud"
+
+#define DISTRHO_PLUGIN_CLAP_ID "dk.fuimadane.drumcloud"
+
+#define DISTRHO_PLUGIN_BRAND_ID  Fuim
+#define DISTRHO_PLUGIN_UNIQUE_ID dDCl
+
+#define DISTRHO_PLUGIN_HAS_UI           1
+#define DISTRHO_PLUGIN_IS_RT_SAFE       1
+#define DISTRHO_PLUGIN_IS_SYNTH         1
+#define DISTRHO_PLUGIN_NUM_INPUTS       0
+#define DISTRHO_PLUGIN_NUM_OUTPUTS      2
+#define DISTRHO_PLUGIN_WANT_MIDI_INPUT  1
+#define DISTRHO_PLUGIN_WANT_MIDI_OUTPUT 0
+#define DISTRHO_UI_FILE_BROWSER         1
+#define DISTRHO_UI_USE_WEB_VIEW         0
+
+#define DISTRHO_PLUGIN_WANT_STATE       1
+#define DISTRHO_PLUGIN_WANT_FULL_STATE  1
+#define DISTRHO_PLUGIN_WANT_TIMEPOS     1
+#define DISTRHO_PLUGIN_WANT_PARAMETER_VALUE_CHANGE_REQUEST 1
+
+// 👇 Her er den vigtige linje, der aktiverer Presets/Programs 👇
+#define DISTRHO_PLUGIN_WANT_PROGRAMS    1
+
+#endif // DISTRHO_PLUGIN_INFO_H_INCLUDED
