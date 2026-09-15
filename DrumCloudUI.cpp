@@ -22,6 +22,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "ArtworkData.hpp"
 
 namespace DISTRHO {
 
@@ -81,15 +82,7 @@ public:
     DrumCloudUI()
         : UI(760, 300)
     {
-        const char* home = std::getenv("HOME");
-        if (home != nullptr)
-        {
-            const std::string devPath = std::string(home) + "/Dev/DPF/examples/DrumCloud/UI/fuimadane_wave_bg.png";
-            fWaveBgLoaded = loadWaveBgTexture(devPath.c_str());
-        }
-
-        if (!fWaveBgLoaded)
-            fWaveBgLoaded = loadWaveBgTexture("UI/fuimadane_wave_bg.png");
+        fWaveBgLoaded = loadWaveBgTexture();
     }
 
     ~DrumCloudUI() override
@@ -156,7 +149,7 @@ private:
     bool fChoosingSample = false;
 
     bool loadWavePreviewFromAudioFile(const char* path);
-    bool loadWaveBgTexture(const char* path);
+    bool loadWaveBgTexture();
     void freeWaveBgTexture();
     
     float getParamMin(uint32_t param) const;
@@ -442,10 +435,12 @@ void DrumCloudUI::drawModernKnob(float cx, float cy, float r, float value, const
     drawPixelText(label, cx - (float)std::strlen(label) * 3.3f, cy + r + 10.0f, 1.20f);
 }
 
-bool DrumCloudUI::loadWaveBgTexture(const char* path)
+bool DrumCloudUI::loadWaveBgTexture()
 {
     int w = 0, h = 0, comp = 0;
-    unsigned char* pixels = stbi_load(path, &w, &h, &comp, 4);
+    unsigned char* pixels = stbi_load_from_memory(
+        kDrumCloudWaveBgPng, static_cast<int>(sizeof(kDrumCloudWaveBgPng)),
+        &w, &h, &comp, 4);
     if (!pixels || w <= 0 || h <= 0) return false;
 
     if (fWaveBgTex != 0) glDeleteTextures(1, &fWaveBgTex);
