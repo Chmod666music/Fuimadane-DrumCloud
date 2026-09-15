@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 
 #define DR_WAV_IMPLEMENTATION
 #include "thirdparty/dr_libs/dr_wav.h"
@@ -98,10 +99,10 @@ bool loadAudioFileToFloat(const char* path, LoadedAudio& out, std::string* err)
             if (err) *err = "dr_wav failed";
             return false;
         }
-        const bool ok = readBounded(out, wav.channels, wav.sampleRate, wav.totalPCMFrameCount,
+        const std::unique_ptr<drwav, void(*)(drwav*)> close(&wav,
+            [](drwav* p){ drwav_uninit(p); });
+        return readBounded(out, wav.channels, wav.sampleRate, wav.totalPCMFrameCount,
             [&wav](uint64_t n, float* p){ return drwav_read_pcm_frames_f32(&wav, n, p); }, err);
-        drwav_uninit(&wav);
-        return ok;
     }
     if (ext == "flac")
     {
@@ -111,10 +112,9 @@ bool loadAudioFileToFloat(const char* path, LoadedAudio& out, std::string* err)
             if (err) *err = "dr_flac failed";
             return false;
         }
-        const bool ok = readBounded(out, flac->channels, flac->sampleRate, flac->totalPCMFrameCount,
+        const std::unique_ptr<drflac, void(*)(drflac*)> close(flac, drflac_close);
+        return readBounded(out, flac->channels, flac->sampleRate, flac->totalPCMFrameCount,
             [flac](uint64_t n, float* p){ return drflac_read_pcm_frames_f32(flac, n, p); }, err);
-        drflac_close(flac);
-        return ok;
     }
     if (ext == "mp3")
     {
@@ -124,10 +124,9 @@ bool loadAudioFileToFloat(const char* path, LoadedAudio& out, std::string* err)
             if (err) *err = "dr_mp3 failed";
             return false;
         }
-        const bool ok = readBounded(out, mp3.channels, mp3.sampleRate, 0,
+        const std::unique_ptr<drmp3, void(*)(drmp3*)> close(&mp3, drmp3_uninit);
+        return readBounded(out, mp3.channels, mp3.sampleRate, 0,
             [&mp3](uint64_t n, float* p){ return drmp3_read_pcm_frames_f32(&mp3, n, p); }, err);
-        drmp3_uninit(&mp3);
-        return ok;
     }
     if (err) *err = "unsupported type";
     return false;
@@ -229,10 +228,10 @@ bool loadAudioFilePreview(const char* path, AudioPreview& out, std::string* err)
             if (err) *err = "dr_wav failed";
             return false;
         }
-        const bool ok = streamPreview(out, wav.channels, wav.sampleRate, wav.totalPCMFrameCount,
+        const std::unique_ptr<drwav, void(*)(drwav*)> close(&wav,
+            [](drwav* p){ drwav_uninit(p); });
+        return streamPreview(out, wav.channels, wav.sampleRate, wav.totalPCMFrameCount,
             [&wav](uint64_t n, float* p){ return drwav_read_pcm_frames_f32(&wav, n, p); }, err);
-        drwav_uninit(&wav);
-        return ok;
     }
     if (ext == "flac")
     {
@@ -242,11 +241,10 @@ bool loadAudioFilePreview(const char* path, AudioPreview& out, std::string* err)
             if (err) *err = "dr_flac failed";
             return false;
         }
-        const bool ok = streamPreview(out, flac->channels, flac->sampleRate,
+        const std::unique_ptr<drflac, void(*)(drflac*)> close(flac, drflac_close);
+        return streamPreview(out, flac->channels, flac->sampleRate,
             flac->totalPCMFrameCount,
             [flac](uint64_t n, float* p){ return drflac_read_pcm_frames_f32(flac, n, p); }, err);
-        drflac_close(flac);
-        return ok;
     }
     if (ext == "mp3")
     {
@@ -256,18 +254,16 @@ bool loadAudioFilePreview(const char* path, AudioPreview& out, std::string* err)
             if (err) *err = "dr_mp3 failed";
             return false;
         }
+        const std::unique_ptr<drmp3, void(*)(drmp3*)> close(&mp3, drmp3_uninit);
         const uint64_t count = drmp3_get_pcm_frame_count(&mp3);
         // Counting unindexed MP3s may move the file cursor; seek back before decoding.
         if (count && !drmp3_seek_to_pcm_frame(&mp3, 0))
         {
-            drmp3_uninit(&mp3);
             if (err) *err = "dr_mp3 seek failed";
             return false;
         }
-        const bool ok = streamPreview(out, mp3.channels, mp3.sampleRate, count,
+        return streamPreview(out, mp3.channels, mp3.sampleRate, count,
             [&mp3](uint64_t n, float* p){ return drmp3_read_pcm_frames_f32(&mp3, n, p); }, err);
-        drmp3_uninit(&mp3);
-        return ok;
     }
     if (err) *err = "unsupported type";
     return false;
