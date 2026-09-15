@@ -13,6 +13,10 @@
 #include <cstdlib>
 #include <cmath>
 #include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <atomic>
 #ifdef __APPLE__
   #include <OpenGL/gl.h>
@@ -83,10 +87,17 @@ public:
         : UI(760, 300)
     {
         fWaveBgLoaded = loadWaveBgTexture();
+        fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
     ~DrumCloudUI() override
     {
+        {
+            std::lock_guard<std::mutex> lock(fPreviewMutex);
+            fPreviewStop = true;
+        }
+        fPreviewCV.notify_one();
+        if (fPreviewThread.joinable()) fPreviewThread.join();
         freeWaveBgTexture();
     }
 
@@ -148,7 +159,26 @@ private:
     bool fRestoringFromParam = false;
     bool fChoosingSample = false;
 
-    bool loadWavePreviewFromAudioFile(const char* path);
+    struct PreviewResult {
+        AudioPreview preview;
+        std::string path;
+        std::string error;
+        uint64_t generation = 0;
+        bool chosen = false;
+        bool success = false;
+    };
+    void previewLoop();
+    std::mutex fPreviewMutex;
+    std::condition_variable fPreviewCV;
+    std::thread fPreviewThread;
+    std::unique_ptr<PreviewResult> fPreviewResult;
+    std::string fPreviewPath;
+    uint64_t fPreviewGeneration = 0;
+    bool fPreviewPending = false;
+    bool fPreviewChosen = false;
+    bool fPreviewStop = false;
+    std::string fLoadStatus;
+    bool fLoadError = false;
     bool loadWaveBgTexture();
     void freeWaveBgTexture();
     
@@ -470,59 +500,40 @@ void DrumCloudUI::freeWaveBgTexture()
     fWaveBgLoaded = false;
 }
 
-bool DrumCloudUI::loadWavePreviewFromAudioFile(const char* path)
+void DrumCloudUI::previewLoop()
 {
-    std::fill_n(fWaveMin, kWavePreviewSize, 0.0f);
-    std::fill_n(fWaveMax, kWavePreviewSize, 0.0f);
-    fWaveValid = false;
-
-    if (path == nullptr || path[0] == '\0') return false;
-
-    LoadedAudio a;
-    std::string err;
-    const bool ok = loadAudioFileToFloat(path, a, &err);
-    if (!ok || a.channels == 0 || a.frames == 0 || a.interleaved.empty()) return false;
-
-    const uint32_t ch = a.channels;
-    const uint64_t frames = a.frames;
-    const float* data = a.interleaved.data();
-    const uint64_t step = std::max<uint64_t>(1u, frames / (uint64_t)kWavePreviewSize);
-
-    for (int i = 0; i < kWavePreviewSize; ++i)
+    for (;;)
     {
-        const uint64_t start = (uint64_t)i * step;
-        const uint64_t end   = std::min<uint64_t>(start + step, frames);
-
-        float mn =  1.0f;
-        float mx = -1.0f;
-
-        for (uint64_t f = start; f < end; ++f)
+        std::string path;
+        uint64_t generation = 0;
+        bool chosen = false;
         {
-            float v = 0.0f;
-            if (ch == 1) { v = data[f]; }
-            else
-            {
-                const uint64_t base = f * (uint64_t)ch;
-                float best = data[base];
-                float bestAbs = std::fabs(best);
-                for (uint32_t c = 1; c < ch; ++c)
-                {
-                    const float s = data[base + c];
-                    const float ab = std::fabs(s);
-                    if (ab > bestAbs) { bestAbs = ab; best = s; }
-                }
-                v = best;
-            }
-            mn = std::min(mn, v);
-            mx = std::max(mx, v);
+            std::unique_lock<std::mutex> lock(fPreviewMutex);
+            fPreviewCV.wait(lock, [this]{ return fPreviewStop || fPreviewPending; });
+            if (fPreviewStop) return;
+            path.swap(fPreviewPath);
+            generation = fPreviewGeneration;
+            chosen = fPreviewChosen;
+            fPreviewPending = false;
         }
 
-        fWaveMin[i] = std::clamp(mn, -1.0f, 1.0f);
-        fWaveMax[i] = std::clamp(mx, -1.0f, 1.0f);
+        std::unique_ptr<PreviewResult> result(new PreviewResult);
+        result->path = std::move(path);
+        result->generation = generation;
+        result->chosen = chosen;
+        try {
+            result->success = loadAudioFilePreview(result->path.c_str(),
+                result->preview, &result->error);
+        } catch (...) {
+            result->error = "not enough memory to load sample";
+            result->success = false;
+        }
+        {
+            std::lock_guard<std::mutex> lock(fPreviewMutex);
+            if (fPreviewStop || generation != fPreviewGeneration) continue;
+            fPreviewResult = std::move(result);
+        }
     }
-
-    fWaveValid = true;
-    return true;
 }
 
 void DrumCloudUI::onDisplay()
@@ -663,6 +674,13 @@ void DrumCloudUI::onDisplay()
             glVertex2f(scanX, y0);
             glVertex2f(scanX, y1);
         glEnd();
+    }
+
+    if (!fLoadStatus.empty())
+    {
+        if (fLoadError) glColor4f(1.0f, 0.44f, 0.34f, 1.0f);
+        else glColor4f(0.62f, 0.92f, 0.79f, 1.0f);
+        drawPixelText(fLoadStatus.c_str(), 18.0f, 95.0f, 1.1f);
     }
 
     // Top Row Knobs (8 knapper)
@@ -813,6 +831,38 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
 
 void DrumCloudUI::uiIdle()
 {
+    std::unique_ptr<PreviewResult> result;
+    {
+        std::lock_guard<std::mutex> lock(fPreviewMutex);
+        result.swap(fPreviewResult);
+    }
+    if (result && result->generation == fPreviewGeneration)
+    {
+        if (result->success)
+        {
+            fSamplePath = result->path;
+            std::copy_n(result->preview.min, kWavePreviewSize, fWaveMin);
+            std::copy_n(result->preview.max, kWavePreviewSize, fWaveMax);
+            fWaveValid = true;
+            fLoadError = false;
+            fLoadStatus = result->chosen ? "FILE ACCEPTED - LOADING SAMPLE" : "SAMPLE PREVIEW READY";
+            if (result->chosen) setState("samplePath", fSamplePath.c_str());
+        }
+        else
+        {
+            // Leave the previous sample and waveform intact on failure.
+            fLoadError = true;
+            if (result->error.find("size limit") != std::string::npos)
+                fLoadStatus = "FILE TOO LONG - LIMIT 16M FRAMES";
+            else if (result->error == "unsupported type")
+                fLoadStatus = "FORMAT NOT SUPPORTED";
+            else if (result->error == "not enough memory to load sample")
+                fLoadStatus = "NOT ENOUGH MEMORY";
+            else
+                fLoadStatus = "FILE MISSING OR INVALID";
+        }
+        repaint();
+    }
     const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
 
     if (std::fabs(scan - fScanPosUI) > 0.0005f)
@@ -969,17 +1019,19 @@ void DrumCloudUI::stateChanged(const char* key, const char* value)
             return;
         }
 
-        fSamplePath = newPath;
-        fWaveValid = false;
-        if (!fSamplePath.empty())
-            fWaveValid = loadWavePreviewFromAudioFile(fSamplePath.c_str());
-
-        if (fChoosingSample && !fRestoringFromParam)
-        {
-            setState("samplePath", fSamplePath.c_str());
-        }
-
+        const bool chosen = fChoosingSample && !fRestoringFromParam;
         fChoosingSample = false;
+        {
+            std::lock_guard<std::mutex> lock(fPreviewMutex);
+            fPreviewPath = newPath;
+            fPreviewChosen = chosen;
+            ++fPreviewGeneration;
+            fPreviewPending = true;
+            fPreviewResult.reset();
+        }
+        fLoadError = false;
+        fLoadStatus = "CHECKING SAMPLE";
+        fPreviewCV.notify_one();
         repaint();
         return;
     }
