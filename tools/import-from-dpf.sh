@@ -38,6 +38,7 @@ fi
 # Pin the old DPF snapshot first; moving to upstream DPF is a separate tested change.
 git submodule add https://github.com/Chmod666music/DPF.git DPF
 git -C DPF checkout v1.8.1
+git -C DPF submodule update --init dgl/src/pugl-upstream
 
 cat > Makefile <<'MAKEFILE'
 NAME = d_drumcloud
@@ -59,8 +60,11 @@ cat > build.sh <<'BUILD'
 set -euo pipefail
 cd "$(dirname "$0")"
 if [[ ! -f DPF/Makefile.plugins.mk ]]; then
-  echo "DPF submodule missing. Run: git submodule update --init --recursive"
+  echo "DPF submodule missing. Run: git submodule update --init DPF"
   exit 1
+fi
+if [[ ! -f DPF/dgl/src/pugl-upstream/include/pugl/pugl.h ]]; then
+  git -C DPF submodule update --init dgl/src/pugl-upstream
 fi
 make CONFIG=Release
 BUILD
