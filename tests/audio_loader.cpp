@@ -51,6 +51,12 @@ int main()
     assert(!loadAudioFileToFloat("oversized.wav", audio, &error));
     assert(error.find("limit") != std::string::npos);
     assert(!loadAudioFileToFloat("missing.wav", audio, &error));
+    {
+        std::ofstream broken("broken.wav", std::ios::binary);
+        broken.write("not a wave", 10);
+    }
+    assert(!loadAudioFileToFloat("broken.wav", audio, &error));
+    std::remove("broken.wav");
     std::remove("small.wav");
     std::remove("oversized.wav");
 }
