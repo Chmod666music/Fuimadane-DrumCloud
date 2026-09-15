@@ -20,7 +20,7 @@ The output goes to `bin/`. See [BUILD.md](BUILD.md) before installing or testing
 
 ## Sample size in the current development branch
 
-This branch accepts WAV, FLAC and MP3 files containing at most **16 million frames** and **32 million decoded float samples**. A stereo file at 48 kHz can be about 5 minutes 33 seconds long; at 44.1 kHz, about 6 minutes 2 seconds. Higher channel counts may hit the decoded-sample limit sooner. These caps protect memory on Linux, Windows and macOS; file size on disk is not a reliable substitute for decoded length.
+The **1.8.2 beta candidate** on this branch accepts WAV, FLAC and MP3 files containing at most **16 million frames** and **32 million decoded float samples**. A stereo file at 48 kHz can be about 5 minutes 33 seconds long; at 44.1 kHz, about 6 minutes 2 seconds. Higher channel counts may hit the decoded-sample limit sooner. These caps protect memory on Linux, Windows and macOS; file size on disk is not a reliable substitute for decoded length.
 
 The waveform preview is prepared in small blocks away from the UI event thread. If a new file is too long, missing, damaged or unsupported, DrumCloud displays the reason and leaves the previously selected sample and waveform in place. A saved project stores the sample **path**, so the audio file must remain at that path for recall. A supported file may still fail DSP preparation if it is changed or removed between validation and playback; the DSP retains its previous audio in that case.
 
