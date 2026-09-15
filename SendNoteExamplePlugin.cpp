@@ -1893,7 +1893,7 @@ void setState(const char* key, const char* value) override
     */
     uint32_t getVersion() const override
 {
-    return d_version(1, 8, 1); 
+    return d_version(1, 8, 2); 
 }
 float getParameterValue(uint32_t index) const override
 {
