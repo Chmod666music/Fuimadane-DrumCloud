@@ -2462,8 +2462,13 @@ private:
             }
             // A newer request replaces a result that has not yet reached audio.
             delete fReady.exchange(nullptr, std::memory_order_acq_rel);
-            std::unique_ptr<GranularEngine::PreparedSample> prepared =
-                GranularEngine::prepareSample(path);
+            std::unique_ptr<GranularEngine::PreparedSample> prepared;
+            try {
+                prepared = GranularEngine::prepareSample(path);
+            } catch (...) {
+                // An allocation failure must not terminate the worker or the host.
+                continue;
+            }
             {
                 std::lock_guard<std::mutex> lock(fWorkerMutex);
                 if (fWorkerStop || fWorkerRequest || !prepared)
