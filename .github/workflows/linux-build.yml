@@ -1,0 +1,30 @@
+name: Linux build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev libx11-dev libxcursor-dev libxext-dev libxrandr-dev libxinerama-dev libasound2-dev libjack-jackd2-dev
+      - name: Verify checked-in artwork matches source PNG
+        run: |
+          python3 tools/embed-artwork.py
+          git diff --exit-code -- ArtworkData.hpp
+      - name: Build CLAP and VST3
+        run: |
+          ./build.sh
+          test -f bin/d_drumcloud.clap
+          test -d bin/d_drumcloud.vst3
