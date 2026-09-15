@@ -25,6 +25,10 @@ jobs:
         run: |
           python3 tools/embed-artwork.py
           git diff --exit-code -- ArtworkData.hpp
+      - name: Test bounded audio loading
+        run: |
+          g++ -std=gnu++17 -O2 -Wall -Wextra tests/audio_loader.cpp AudioFileLoader.cpp -o /tmp/drumcloud-audio-loader-test
+          /tmp/drumcloud-audio-loader-test
       - name: Build CLAP and VST3
         run: |
           ./build.sh

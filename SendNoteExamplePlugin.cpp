@@ -113,6 +113,11 @@ struct CloudReverb {
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <atomic>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <system_error>
 #include <fstream>
 #include <cstdlib>   // getenv
@@ -463,24 +468,49 @@ public:
 }
 
 
-bool setSamplePath(const char* path)
-    {
-        if (path == nullptr || path[0] == '\0')
-            return false;
+// Decoding and preview generation run only on the worker's private engine.
+    struct PreparedSample {
+        std::vector<float> left, right;
+        uint32_t sampleRate = 0;
+        int length = 0;
+        int32_t markers[64]{};
+        int markerCount = 0;
+        float waveMin[1024]{};
+        float waveMax[1024]{};
+    };
 
-        fPendingPath = path;
-        fPendingLoad = true;
-        return true;
+    static std::unique_ptr<PreparedSample> prepareSample(const std::string& path)
+    {
+        std::unique_ptr<GranularEngine> scratch(new GranularEngine);
+        if (!scratch->loadSample(path.c_str()))
+            return nullptr;
+        std::unique_ptr<PreparedSample> prepared(new PreparedSample);
+        prepared->left = std::move(scratch->sampleL);
+        prepared->right = std::move(scratch->sampleR);
+        prepared->sampleRate = scratch->sampleSR;
+        prepared->length = scratch->sampleLen;
+        prepared->markerCount = scratch->markerCount;
+        std::memcpy(prepared->markers, scratch->markers, sizeof(prepared->markers));
+        std::memcpy(prepared->waveMin, scratch->waveMin, sizeof(prepared->waveMin));
+        std::memcpy(prepared->waveMax, scratch->waveMax, sizeof(prepared->waveMax));
+        return prepared;
     }
 
-    bool consumePendingSamplePath(std::string& outPath)
+    // Swaps ownership in constant time; the worker later destroys the old vectors.
+    void applyPreparedSample(PreparedSample& prepared) noexcept
     {
-        if (!fPendingLoad)
-            return false;
-
-        fPendingLoad = false;
-        outPath = fPendingPath;
-        return true;
+        // Retire grains referencing the old sample, while keeping held MIDI notes.
+        activeCount = 0;
+        fSpawnAcc = 0.0f;
+        for (int i = 0; i < kMaxGrains; ++i) grains[i].active = false;
+        sampleL.swap(prepared.left);
+        sampleR.swap(prepared.right);
+        sampleLen = prepared.length;
+        sampleSR = prepared.sampleRate;
+        markerCount = prepared.markerCount;
+        std::memcpy(markers, prepared.markers, sizeof(markers));
+        std::memcpy(waveMin, prepared.waveMin, sizeof(waveMin));
+        std::memcpy(waveMax, prepared.waveMax, sizeof(waveMax));
     }
 
 
@@ -510,16 +540,6 @@ void reset()
     // fPitchRate = 1.0f;
     // rng = 0x12345678u;
 }
-    bool doPendingLoad()
-{
-    if (!fPendingLoad)
-        return false;
-
-    fPendingLoad = false;
-    return loadSample(fPendingPath.c_str());   // loadSample kan forblive private
-}
-
-
     bool isSilent() const
     {
         for (int i = 0; i < kMaxGrains; ++i)
@@ -1043,10 +1063,6 @@ int sampleLen = 0;
 
 
 private:
-    std::string fPendingPath;
-    bool fPendingLoad = false;
-
-
 void updateDensityFromNorm()
 {
     // Shaped density curve:
@@ -1352,11 +1368,6 @@ void swapRemove(int idx)
 
     if (a.frames == 0 || a.channels == 0)
         return false;
-
-    // clamp (optional) - choose a max length if you want
-    // e.g. 10 seconds at 48k:
-    // const uint64_t maxFrames = (uint64_t)(getSampleRate() * 10.0);
-    // if (a.frames > maxFrames) a.frames = maxFrames;
 
     const size_t frames = (size_t)a.frames;
 
@@ -1737,8 +1748,22 @@ class SendNoteExamplePlugin : public Plugin
 {
 public:
     SendNoteExamplePlugin()
-    : Plugin(paramCount, 1, stateCount) // Nu har vi 1 program!
-{}
+    : Plugin(paramCount, 1, stateCount)
+    {
+        fWorker = std::thread([this]{ workerLoop(); });
+    }
+
+    ~SendNoteExamplePlugin() override
+    {
+        {
+            std::lock_guard<std::mutex> lock(fWorkerMutex);
+            fWorkerStop = true;
+        }
+        fWorkerCV.notify_one();
+        if (fWorker.joinable()) fWorker.join();
+        delete fReady.exchange(nullptr, std::memory_order_acq_rel);
+        delete fRetired.exchange(nullptr, std::memory_order_acq_rel);
+    }
 
 
 
@@ -1817,7 +1842,15 @@ void setState(const char* key, const char* value) override
         if (newPath != fSamplePath)
         {
             fSamplePath = newPath;
-            fPendingSampleLoad = !fSamplePath.empty();
+            if (!fSamplePath.empty())
+            {
+                {
+                    std::lock_guard<std::mutex> lock(fWorkerMutex);
+                    fWorkerPath = fSamplePath;
+                    fWorkerRequest = true;
+                }
+                fWorkerCV.notify_one();
+            }
         }
     }
 }
@@ -2292,17 +2325,21 @@ void initParameter(uint32_t index, Parameter& parameter) override
         fGranInit = true;
     }
 
-    fGran.doPendingLoad();
+    // The audio callback only exchanges pointers and fixed-size preview data.
+    // Wait for the worker to reclaim the previous sample before accepting another.
+    if (fRetired.load(std::memory_order_acquire) == nullptr)
+    {
+        if (GranularEngine::PreparedSample* ready =
+                fReady.exchange(nullptr, std::memory_order_acq_rel))
+        {
+            fGran.applyPreparedSample(*ready);
+            fRetired.store(ready, std::memory_order_release);
+        }
+    }
 
     if (fGranInit && !fTriedRestore)
     {
         fTriedRestore = true;
-    }
-
-    if (fGranInit && fPendingSampleLoad && !fSamplePath.empty())
-    {
-        fGran.setSamplePath(fSamplePath.c_str());
-        fPendingSampleLoad = false;
     }
 
     // --- host tempo -> engine ---
@@ -2406,6 +2443,46 @@ void initParameter(uint32_t index, Parameter& parameter) override
 
 
 private:
+    void workerLoop()
+    {
+        for (;;)
+        {
+            // Reclaim old buffers on this thread, never in the audio callback.
+            delete fRetired.exchange(nullptr, std::memory_order_acq_rel);
+            std::string path;
+            {
+                std::unique_lock<std::mutex> lock(fWorkerMutex);
+                fWorkerCV.wait_for(lock, std::chrono::milliseconds(20),
+                    [this]{ return fWorkerStop || fWorkerRequest ||
+                        fRetired.load(std::memory_order_acquire) != nullptr; });
+                if (fWorkerStop) break;
+                if (!fWorkerRequest) continue;
+                path.swap(fWorkerPath);
+                fWorkerRequest = false;
+            }
+            // A newer request replaces a result that has not yet reached audio.
+            delete fReady.exchange(nullptr, std::memory_order_acq_rel);
+            std::unique_ptr<GranularEngine::PreparedSample> prepared =
+                GranularEngine::prepareSample(path);
+            {
+                std::lock_guard<std::mutex> lock(fWorkerMutex);
+                if (fWorkerStop || fWorkerRequest || !prepared)
+                    continue;
+                delete fReady.exchange(prepared.release(), std::memory_order_acq_rel);
+            }
+        }
+        delete fRetired.exchange(nullptr, std::memory_order_acq_rel);
+    }
+
+    std::mutex fWorkerMutex;
+    std::condition_variable fWorkerCV;
+    std::thread fWorker;
+    std::string fWorkerPath;
+    bool fWorkerRequest = false;
+    bool fWorkerStop = false;
+    std::atomic<GranularEngine::PreparedSample*> fReady{nullptr};
+    std::atomic<GranularEngine::PreparedSample*> fRetired{nullptr};
+
     std::string fSamplePath;
     uint32_t fSampleId = 0;
     float fSamplePing = 0.0f;
@@ -2416,7 +2493,6 @@ private:
     float fVolume = 1.0f;
     float fVelocityAmount = 0.42f;
     float fVelocityGrainSize = 0.58f;
-    bool fPendingSampleLoad = false;
     double fLastSR = 0.0;
     bool fTriedRestore = false;
     float fReleaseMs = 452.5f; 
