@@ -499,7 +499,10 @@ public:
     // Swaps ownership in constant time; the worker later destroys the old vectors.
     void applyPreparedSample(PreparedSample& prepared) noexcept
     {
-        reset();
+        // Retire grains referencing the old sample, while keeping held MIDI notes.
+        activeCount = 0;
+        fSpawnAcc = 0.0f;
+        for (int i = 0; i < kMaxGrains; ++i) grains[i].active = false;
         sampleL.swap(prepared.left);
         sampleR.swap(prepared.right);
         sampleLen = prepared.length;
