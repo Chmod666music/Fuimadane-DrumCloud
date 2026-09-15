@@ -23,7 +23,7 @@ The current file in [DrumCloud-ReaPack](https://github.com/Chmod666music/DrumClo
 
 ## Repository identity
 
-The current repository is a full DPF fork with DrumCloud under `examples/DrumCloud`. Prefer a dedicated `Fuimadane-DrumCloud` repository for product discovery, releases and tester issues, while keeping DPF credited as the framework. Before moving, verify submodules, build paths, release assets, GitHub links and local remotes. Preserve git history or document the source import, and point existing users to the new canonical repository. Avoid claiming the migration is complete until builds and links work from the dedicated checkout.
+This dedicated repository contains the imported native source. DPF is pinned as a submodule at the v1.8.1 release commit; the former `Chmod666music/DPF` repository and release remain historical references. The Linux CLAP and VST3 builds and Bitwig smoke tests passed from the standalone checkout. Before beta packaging, confirm a clean clone, another Linux host, and portable paths. Keep future releases and tester reports here, and continue to credit DPF upstream.
 
 ## Native order of work
 
