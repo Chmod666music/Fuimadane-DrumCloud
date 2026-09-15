@@ -13,8 +13,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: recursive
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
