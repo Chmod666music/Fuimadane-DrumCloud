@@ -602,6 +602,46 @@ void setPitchRateParam(float v) noexcept
     fPitchRateParam = std::clamp(v, 0.5f, 2.0f);
 }
 
+float getRootNote() const noexcept
+{
+    return fRootNote;
+}
+
+void setRootNote(float note) noexcept
+{
+    fRootNote = std::clamp(std::round(note), 0.0f, 127.0f);
+}
+
+float getSampleFineTune() const noexcept
+{
+    return fSampleFineTuneCents;
+}
+
+void setSampleFineTune(float cents) noexcept
+{
+    fSampleFineTuneCents = std::clamp(cents, -100.0f, 100.0f);
+}
+
+float getGrainAttackMs() const noexcept
+{
+    return fGrainAttackMs;
+}
+
+void setGrainAttackMs(float ms) noexcept
+{
+    fGrainAttackMs = std::clamp(ms, 0.0f, 500.0f);
+}
+
+float getGrainReleaseMs() const noexcept
+{
+    return fGrainReleaseMs;
+}
+
+void setGrainReleaseMs(float ms) noexcept
+{
+    fGrainReleaseMs = std::clamp(ms, 0.0f, 1000.0f);
+}
+
 float getScanSpeed() const noexcept
 {
     return fScanSpeed;
@@ -756,10 +796,14 @@ void trigger(int note, int vel)
     fCurrentVel  = uint8_t(vel & 0x7F);
     fReleaseLeft = 0;
 
-    // NOTE → PITCH
-    const float noteNorm = (float(note) - 60.0f) / 12.0f;
-    const float pitchFollow = 0.25f;
-    fPitchRate = fPitchRateParam * std::pow(2.0f, noteNorm * pitchFollow);
+    // Chromatic sample mapping: the root key plays at the sample's original pitch.
+    // Fine tune is expressed in cents, and sample-rate compensation keeps pitch
+    // correct when the file and host use different sample rates.
+    const float semitones = (float(note) - fRootNote) + fSampleFineTuneCents / 100.0f;
+    const float sampleRateRatio = (sampleSR > 0 && sr > 0.0f)
+        ? float(sampleSR) / sr
+        : 1.0f;
+    fPitchRate = fPitchRateParam * std::pow(2.0f, semitones / 12.0f) * sampleRateRatio;
 
     // velocity -> density (blend with base density knob)
     const float velNorm   = float(vel) / 127.0f;
@@ -1184,25 +1228,38 @@ void swapRemove(int idx)
 
     float windowAt(int32_t age, int32_t dur) const
     {
-        if (dur <= 1) return 0.0f;
+        if (dur <= 1 || age < 0 || age >= dur) return 0.0f;
 
-        const float ph = float(age) / float(dur - 1);
+        float attackFrames = fGrainAttackMs * 0.001f * sr;
+        float releaseFrames = fGrainReleaseMs * 0.001f * sr;
+        const float available = float(dur - 1);
+        const float requested = attackFrames + releaseFrames;
 
-        const float attackEnd = 0.025f;
-        const float holdEnd   = 0.160f;
-
-        if (ph <= attackEnd)
+        // Very short grains still receive both slopes without exceeding their life.
+        if (requested > available && requested > 0.0f)
         {
-            const float t = ph / attackEnd;
-            return 0.25f + 0.75f * t;
+            const float scale = available / requested;
+            attackFrames *= scale;
+            releaseFrames *= scale;
         }
 
-        if (ph <= holdEnd)
-            return 1.0f;
+        float envelope = 1.0f;
+        if (attackFrames > 0.0f && float(age) < attackFrames)
+        {
+            const float t = std::clamp(float(age) / attackFrames, 0.0f, 1.0f);
+            const float a = std::sin(t * float(M_PI) * 0.5f);
+            envelope = a * a;
+        }
 
-        const float t = (ph - holdEnd) / (1.0f - holdEnd);
-        const float c = std::cos(t * float(M_PI) * 0.5f);
-        return c * c;
+        const float remaining = float(dur - 1 - age);
+        if (releaseFrames > 0.0f && remaining < releaseFrames)
+        {
+            const float t = std::clamp(remaining / releaseFrames, 0.0f, 1.0f);
+            const float r = std::sin(t * float(M_PI) * 0.5f);
+            envelope = std::min(envelope, r * r);
+        }
+
+        return envelope;
     }
 
     int32_t snapBackward(int32_t raw, int32_t radius) const
@@ -1669,7 +1726,11 @@ private:
 
     float sr = 48000.0f;
     float fPitchRate = 1.0f;
-    float fPitchRateParam = 0.71f;
+    float fPitchRateParam = 1.0f;
+    float fRootNote = 60.0f;
+    float fSampleFineTuneCents = 0.0f;
+    float fGrainAttackMs = 10.0f;
+    float fGrainReleaseMs = 80.0f;
     bool noteIsHeld[128]{};
     uint8_t lastNoteOn  = 60;
     uint8_t lastNoteOff = 0;
@@ -1893,7 +1954,7 @@ void setState(const char* key, const char* value) override
     */
     uint32_t getVersion() const override
 {
-    return d_version(1, 8, 2); 
+    return d_version(1, 9, 0); 
 }
 float getParameterValue(uint32_t index) const override
 {
@@ -1962,6 +2023,18 @@ float getParameterValue(uint32_t index) const override
 
     if (index == paramScanPos)
         return 0.0f;
+
+    if (index == paramRootNote)
+        return fGran.getRootNote();
+
+    if (index == paramSampleFineTune)
+        return fGran.getSampleFineTune();
+
+    if (index == paramGrainAttack)
+        return fGran.getGrainAttackMs();
+
+    if (index == paramGrainRelease)
+        return fGran.getGrainReleaseMs();
 
     return 0.0f;
 }
@@ -2054,6 +2127,22 @@ void setParameterValue(uint32_t index, float value) override
         fSamplePing = value;
         break;
 
+    case paramRootNote:
+        fGran.setRootNote(value);
+        break;
+
+    case paramSampleFineTune:
+        fGran.setSampleFineTune(value);
+        break;
+
+    case paramGrainAttack:
+        fGran.setGrainAttackMs(value);
+        break;
+
+    case paramGrainRelease:
+        fGran.setGrainReleaseMs(value);
+        break;
+
     default:
         break;
     }
@@ -2090,7 +2179,7 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramDensity, 0.72f);
             setParameterValue(paramVelocityToDensity, 0.42f);
             setParameterValue(paramVelocityToGrainSize, 0.58f);
-            setParameterValue(paramPitchRate, 0.71f);
+            setParameterValue(paramPitchRate, 1.0f);
             setParameterValue(paramRelease, 452.5f);
             setParameterValue(paramStartPosition, 0.0f);
             setParameterValue(paramPositionSpread, 0.0f);
@@ -2108,6 +2197,10 @@ void loadProgram(uint32_t index) override
             // 👇 De to nye reverb-parametre 👇
             setParameterValue(paramReverbSize, 0.8f);
             setParameterValue(paramReverbMix, 0.0f);
+            setParameterValue(paramRootNote, 60.0f);
+            setParameterValue(paramSampleFineTune, 0.0f);
+            setParameterValue(paramGrainAttack, 10.0f);
+            setParameterValue(paramGrainRelease, 80.0f);
         }
 }
 
@@ -2150,7 +2243,7 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.symbol = "pitch_rate";
         parameter.ranges.min = 0.5f;
         parameter.ranges.max = 2.0f;
-        parameter.ranges.def = 0.71f;
+        parameter.ranges.def = 1.0f;
         break;
 
     case paramRelease:
@@ -2269,6 +2362,42 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.hints  = kParameterIsHidden | kParameterIsOutput;
         parameter.ranges.def = 0.0f;
         break;
+
+    case paramRootNote:
+        parameter.name   = "Root MIDI Note";
+        parameter.symbol = "root_note";
+        parameter.hints  = kParameterIsAutomatable | kParameterIsInteger;
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 127.0f;
+        parameter.ranges.def = 60.0f;
+        break;
+
+    case paramSampleFineTune:
+        parameter.name   = "Sample Fine Tune";
+        parameter.symbol = "sample_fine_tune";
+        parameter.unit   = "ct";
+        parameter.ranges.min = -100.0f;
+        parameter.ranges.max = 100.0f;
+        parameter.ranges.def = 0.0f;
+        break;
+
+    case paramGrainAttack:
+        parameter.name   = "Grain Attack";
+        parameter.symbol = "grain_attack";
+        parameter.unit   = "ms";
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 500.0f;
+        parameter.ranges.def = 10.0f;
+        break;
+
+    case paramGrainRelease:
+        parameter.name   = "Grain Release";
+        parameter.symbol = "grain_release";
+        parameter.unit   = "ms";
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 1000.0f;
+        parameter.ranges.def = 80.0f;
+        break;
     }
 }
 
@@ -2321,6 +2450,7 @@ void initParameter(uint32_t index, Parameter& parameter) override
     {
         fGran.init(getSampleRate());
         m_reverb.init(getSampleRate()); // 👈 VIGTIGT: Starter rumklangen
+        fLimiterReleaseCoeff = 1.0f - std::exp(-1.0f / (0.100f * float(std::max(1.0, getSampleRate()))));
         fLastSR = getSampleRate();
         fGranInit = true;
     }
@@ -2427,12 +2557,31 @@ void initParameter(uint32_t index, Parameter& parameter) override
         fScanMeterCountdown = (fScanMeterCountdown > frames) ? (fScanMeterCountdown - frames) : 0;
     }
 
-    // --- apply output gain ---
+    // --- apply output gain and linked-stereo peak protection ---
     const float vol = fVolume * fVolume;
+    constexpr float kPeakCeiling = 0.98f;
     for (uint32_t f = 0; f < frames; ++f)
     {
-        outL[f] *= vol;
-        outR[f] *= vol;
+        float left = outL[f] * vol;
+        float right = outR[f] * vol;
+
+        if (!std::isfinite(left) || !std::isfinite(right))
+        {
+            outL[f] = 0.0f;
+            outR[f] = 0.0f;
+            fLimiterGain = 0.0f;
+            continue;
+        }
+
+        const float peak = std::max(std::fabs(left), std::fabs(right));
+        const float target = peak > kPeakCeiling ? kPeakCeiling / peak : 1.0f;
+        if (target < fLimiterGain)
+            fLimiterGain = target; // immediate attack
+        else
+            fLimiterGain += (1.0f - fLimiterGain) * fLimiterReleaseCoeff;
+
+        outL[f] = left * fLimiterGain;
+        outR[f] = right * fLimiterGain;
     }
 }
 
@@ -2496,6 +2645,8 @@ private:
     bool fGranInit = false;
 
     float fVolume = 1.0f;
+    float fLimiterGain = 1.0f;
+    float fLimiterReleaseCoeff = 0.001f;
     float fVelocityAmount = 0.42f;
     float fVelocityGrainSize = 0.58f;
     double fLastSR = 0.0;
