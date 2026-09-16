@@ -24,11 +24,56 @@
   #include <GL/gl.h>
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#include "ArtworkData.hpp"
-
 namespace DISTRHO {
+
+struct DrumCloudKnobSpec
+{
+    uint32_t param;
+    float x;
+    float y;
+    float radius;
+    const char* label;
+};
+
+static constexpr DrumCloudKnobSpec kDrumCloudKnobs[] = {
+    // Voice / grain
+    { paramVolume, 70.0f, 248.0f, 19.0f, "VOL" },
+    { paramDensity, 162.0f, 248.0f, 19.0f, "DENS" },
+    { paramRelease, 254.0f, 248.0f, 19.0f, "REL" },
+    { paramVelocityToDensity, 346.0f, 248.0f, 19.0f, "V DENS" },
+    { paramVelocityToGrainSize, 70.0f, 326.0f, 19.0f, "V GSIZ" },
+    { paramPitchRate, 162.0f, 326.0f, 19.0f, "PITCH" },
+    { paramGrainAttack, 254.0f, 326.0f, 19.0f, "G ATK" },
+    { paramGrainRelease, 346.0f, 326.0f, 19.0f, "G REL" },
+
+    // Position / motion
+    { paramStartPosition, 470.0f, 248.0f, 19.0f, "START" },
+    { paramPositionSpread, 562.0f, 248.0f, 19.0f, "SPREAD" },
+    { paramScanSpeed, 654.0f, 248.0f, 19.0f, "SCAN" },
+    { paramSyncRate, 746.0f, 248.0f, 19.0f, "SYNC" },
+    { paramScanJumpRate, 470.0f, 326.0f, 19.0f, "J RATE" },
+    { paramScanJumpAmount, 562.0f, 326.0f, 19.0f, "J AMNT" },
+    { paramScanJumpSmoothMs, 654.0f, 326.0f, 19.0f, "J SMTH" },
+    { paramTimeStretch, 746.0f, 326.0f, 19.0f, "STRETCH" },
+
+    // Tone / pitch
+    { paramFilter, 72.0f, 454.0f, 20.0f, "FILTER" },
+    { paramResonance, 166.0f, 454.0f, 20.0f, "RESO" },
+    { paramRootNote, 260.0f, 454.0f, 20.0f, "ROOT" },
+    { paramSampleFineTune, 354.0f, 454.0f, 20.0f, "FINE" },
+
+    // Reverb
+    { paramReverbSize, 548.0f, 454.0f, 22.0f, "SIZE" },
+    { paramReverbMix, 680.0f, 454.0f, 22.0f, "MIX" },
+
+    // Delay
+    { paramDelayMode, 80.0f, 594.0f, 20.0f, "MODE" },
+    { paramDelayTimeLeft, 212.0f, 594.0f, 20.0f, "TIME L" },
+    { paramDelayTimeRight, 344.0f, 594.0f, 20.0f, "TIME R" },
+    { paramDelayFeedback, 476.0f, 594.0f, 20.0f, "FDBK" },
+    { paramDelayMix, 608.0f, 594.0f, 20.0f, "MIX" },
+    { paramDelayDamping, 740.0f, 594.0f, 20.0f, "DAMP" }
+};
 
 extern std::atomic<float> gDrumCloudUiScanPos;
 extern std::atomic<int>   gDrumCloudUiScanMode;
@@ -91,9 +136,8 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(760, 470)
+        : UI(820, 700)
     {
-        fWaveBgLoaded = loadWaveBgTexture();
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
@@ -105,7 +149,6 @@ public:
         }
         fPreviewCV.notify_one();
         if (fPreviewThread.joinable()) fPreviewThread.join();
-        freeWaveBgTexture();
     }
 
 protected:
@@ -121,11 +164,6 @@ private:
     float fWaveMin[kWavePreviewSize]{};
     float fWaveMax[kWavePreviewSize]{};
     bool  fWaveValid = false;
-
-    GLuint fWaveBgTex = 0;
-    int    fWaveBgTexW = 0;
-    int    fWaveBgTexH = 0;
-    bool   fWaveBgLoaded = false;
 
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
@@ -208,15 +246,17 @@ private:
     bool fPreviewStop = false;
     std::string fLoadStatus;
     bool fLoadError = false;
-    bool loadWaveBgTexture();
-    void freeWaveBgTexture();
-    
     float getParamMin(uint32_t param) const;
     float getParamMax(uint32_t param) const;
     float getParamDef(uint32_t param) const;
     float getParamUiValue(uint32_t param) const;
     void  setParamUiValue(uint32_t param, float value);
     bool  hitKnob(float mx, float my, float cx, float cy, float r) const;
+    uint32_t knobAt(float mx, float my) const;
+    float normaliseParamValue(uint32_t param, float value) const;
+    void formatParamValue(uint32_t param, float value, char* text, std::size_t size) const;
+    void drawParameterKnob(const DrumCloudKnobSpec& spec) const;
+    void drawPanel(float x, float y, float width, float height, const char* title) const;
     void  drawStrokeChar(char c, float x, float y, float s) const;
     void  drawStrokeText(const char* txt, float x, float y, float s) const;
     void  drawPixelGlyph(char c, float x, float y, float scale) const;
@@ -421,12 +461,111 @@ bool DrumCloudUI::hitKnob(float mx, float my, float cx, float cy, float r) const
     return (dx*dx + dy*dy) <= (r*r);
 }
 
+uint32_t DrumCloudUI::knobAt(float mx, float my) const
+{
+    for (const DrumCloudKnobSpec& spec : kDrumCloudKnobs)
+        if (hitKnob(mx, my, spec.x, spec.y, spec.radius + 3.0f))
+            return spec.param;
+    return 0xffffffffu;
+}
+
+float DrumCloudUI::normaliseParamValue(uint32_t param, float value) const
+{
+    if (param == paramTimeStretch)
+        return std::clamp((std::log2(std::max(0.25f, value)) + 2.0f) * 0.25f, 0.0f, 1.0f);
+
+    const float vmin = getParamMin(param);
+    const float vmax = getParamMax(param);
+    return vmax > vmin ? std::clamp((value - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
+}
+
+void DrumCloudUI::formatParamValue(uint32_t param, float value, char* text, std::size_t size) const
+{
+    if (text == nullptr || size == 0) return;
+
+    switch (param)
+    {
+    case paramRelease:
+    case paramGrainAttack:
+    case paramGrainRelease:
+    case paramScanJumpSmoothMs:
+    case paramDelayTimeLeft:
+    case paramDelayTimeRight:
+        std::snprintf(text, size, "%.0f MS", value);
+        return;
+    case paramScanJumpRate:
+        std::snprintf(text, size, "%.1f HZ", value);
+        return;
+    case paramPitchRate:
+    case paramTimeStretch:
+        std::snprintf(text, size, "%.2f X", value);
+        return;
+    case paramRootNote:
+        std::snprintf(text, size, "MIDI %.0f", value);
+        return;
+    case paramSampleFineTune:
+        std::snprintf(text, size, "%.0f CT", value);
+        return;
+    case paramSyncRate:
+        std::snprintf(text, size, "%s", value < 0.25f ? "0.5 X" : (value < 0.75f ? "1 X" : "2 X"));
+        return;
+    case paramDelayMode:
+        std::snprintf(text, size, "%s", value < 0.5f ? "OFF" : (value < 1.5f ? "STEREO" : "PING PONG"));
+        return;
+    default:
+        std::snprintf(text, size, "%.0f %%", value * 100.0f);
+        return;
+    }
+}
+
+void DrumCloudUI::drawParameterKnob(const DrumCloudKnobSpec& spec) const
+{
+    const float value = getParamUiValue(spec.param);
+    drawModernKnob(spec.x, spec.y, spec.radius,
+                   normaliseParamValue(spec.param, value), spec.label,
+                   fHoverKnobParam == spec.param);
+
+    char valueText[24]{};
+    formatParamValue(spec.param, value, valueText, sizeof(valueText));
+    glColor4f(0.74f, 0.76f, 0.80f, 0.96f);
+    drawPixelText(valueText,
+                  spec.x - float(std::strlen(valueText)) * 3.0f,
+                  spec.y + spec.radius + 23.0f, 1.0f);
+}
+
+void DrumCloudUI::drawPanel(float x, float y, float width, float height, const char* title) const
+{
+    glColor4f(0.045f, 0.048f, 0.058f, 0.98f);
+    glBegin(GL_QUADS);
+        glVertex2f(x, y); glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height); glVertex2f(x, y + height);
+    glEnd();
+
+    glLineWidth(1.0f);
+    glColor4f(0.22f, 0.23f, 0.27f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+        glVertex2f(x, y); glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height); glVertex2f(x, y + height);
+    glEnd();
+
+    glColor4f(0.94f, 0.68f, 0.19f, 0.98f);
+    drawPixelText(title, x + 12.0f, y + 10.0f, 1.15f);
+
+    glColor4f(0.18f, 0.19f, 0.22f, 1.0f);
+    glBegin(GL_LINES);
+        glVertex2f(x + 12.0f, y + 27.0f);
+        glVertex2f(x + width - 12.0f, y + 27.0f);
+    glEnd();
+}
+
 static const uint8_t* getPixelGlyphRows(char c)
 {
     static const uint8_t SPACE[7] = {0,0,0,0,0,0,0};
     static const uint8_t DOT[7]   = {0,0,0,0,0,0x0C,0x0C};
     static const uint8_t DASH[7]  = {0,0,0,0x1E,0,0,0};
     static const uint8_t COLON[7] = {0,0x0C,0x0C,0,0x0C,0x0C,0};
+    static const uint8_t SLASH[7] = {0x01,0x02,0x02,0x04,0x08,0x08,0x10};
+    static const uint8_t PERCENT[7] = {0x19,0x1A,0x04,0x04,0x08,0x0B,0x13};
     static const uint8_t A[7] = {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11};
     static const uint8_t B[7] = {0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E};
     static const uint8_t C[7] = {0x0E,0x11,0x10,0x10,0x10,0x11,0x0E};
@@ -475,7 +614,8 @@ static const uint8_t* getPixelGlyphRows(char c)
     case '0': return N0; case '1': return N1; case '2': return N2; case '3': return N3;
     case '4': return N4; case '5': return N5; case '6': return N6; case '7': return N7;
     case '8': return N8; case '9': return N9;
-    case '.': return DOT; case '-': return DASH; case ':': return COLON; case ' ': return SPACE;
+    case '.': return DOT; case '-': return DASH; case ':': return COLON;
+    case '/': return SLASH; case '%': return PERCENT; case ' ': return SPACE;
     default: return SPACE;
     }
 }
@@ -564,41 +704,6 @@ void DrumCloudUI::drawModernKnob(float cx, float cy, float r, float value, const
     drawPixelText(label, cx - (float)std::strlen(label) * 3.3f, cy + r + 10.0f, 1.20f);
 }
 
-bool DrumCloudUI::loadWaveBgTexture()
-{
-    int w = 0, h = 0, comp = 0;
-    unsigned char* pixels = stbi_load_from_memory(
-        kDrumCloudWaveBgPng, static_cast<int>(sizeof(kDrumCloudWaveBgPng)),
-        &w, &h, &comp, 4);
-    if (!pixels || w <= 0 || h <= 0) return false;
-
-    if (fWaveBgTex != 0) glDeleteTextures(1, &fWaveBgTex);
-
-    glGenTextures(1, &fWaveBgTex);
-    glBindTexture(GL_TEXTURE_2D, fWaveBgTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    stbi_image_free(pixels);
-
-    fWaveBgTexW = w;
-    fWaveBgTexH = h;
-    return true;
-}
-
-void DrumCloudUI::freeWaveBgTexture()
-{
-    if (fWaveBgTex != 0) { glDeleteTextures(1, &fWaveBgTex); fWaveBgTex = 0; }
-    fWaveBgTexW = 0;
-    fWaveBgTexH = 0;
-    fWaveBgLoaded = false;
-}
-
 void DrumCloudUI::previewLoop()
 {
     for (;;)
@@ -638,66 +743,57 @@ void DrumCloudUI::previewLoop()
 void DrumCloudUI::onDisplay()
 {
     const float W = (float)getWidth();
-    const float waveTop = 12.0f;
-    const float waveBottom = 112.0f;
+    const float waveTop = 52.0f;
+    const float waveBottom = 176.0f;
     const float mid = 0.5f * (waveTop + waveBottom);
 
     glDisable(GL_TEXTURE_2D);
-    glClearColor(0.06f, 0.06f, 0.07f, 1.0f);
+    glClearColor(0.018f, 0.019f, 0.024f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    // Fuimadane identity and instrument hierarchy.
+    glColor4f(0.95f, 0.70f, 0.22f, 1.0f);
+    drawPixelText("DRUMCLOUD", 18.0f, 15.0f, 2.0f);
+    glColor4f(0.62f, 0.64f, 0.69f, 0.96f);
+    drawPixelText("FUIMADANE GRANULAR INSTRUMENT", 150.0f, 20.0f, 1.05f);
+    glColor4f(0.82f, 0.60f, 0.19f, 0.94f);
+    drawPixelText("V1.9 BETA", W - 78.0f, 20.0f, 1.0f);
+
+    // Waveform frame.
+    glColor4f(0.035f, 0.038f, 0.047f, 1.0f);
+    glBegin(GL_QUADS);
+        glVertex2f(18.0f, waveTop); glVertex2f(W - 18.0f, waveTop);
+        glVertex2f(W - 18.0f, waveBottom); glVertex2f(18.0f, waveBottom);
+    glEnd();
+    glLineWidth(1.0f);
+    glColor4f(0.25f, 0.26f, 0.30f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+        glVertex2f(18.0f, waveTop); glVertex2f(W - 18.0f, waveTop);
+        glVertex2f(W - 18.0f, waveBottom); glVertex2f(18.0f, waveBottom);
+    glEnd();
+
+    drawPanel(18.0f, 192.0f, 384.0f, 188.0f, "VOICE / GRAIN");
+    drawPanel(418.0f, 192.0f, 384.0f, 188.0f, "POSITION / MOTION");
+    drawPanel(18.0f, 396.0f, 384.0f, 124.0f, "TONE / PITCH");
+    drawPanel(418.0f, 396.0f, 384.0f, 124.0f, "REVERB");
+    drawPanel(18.0f, 536.0f, 784.0f, 146.0f, "FILTERED DELAY");
 
     glLineWidth(1.0f);
     glColor4f(0.25f, 0.25f, 0.28f, 1.0f);
     glBegin(GL_LINES);
-        glVertex2f(12.0f, mid);
-        glVertex2f(W - 12.0f, mid);
+        glVertex2f(18.0f, mid);
+        glVertex2f(W - 18.0f, mid);
     glEnd();
 
     if (fWaveValid)
     {
-        const float x0 = 12.0f;
-        const float x1 = W - 12.0f;
+        const float x0 = 18.0f;
+        const float x1 = W - 18.0f;
         const float y0 = waveTop;
         const float y1 = waveBottom;
         const float scanPos = std::clamp(fScanPosUI, 0.0f, 1.0f);
         const float scanX = x0 + scanPos * (x1 - x0);
         const float ampY = 0.5f * (y1 - y0);
-
-        if (fWaveBgLoaded && fWaveBgTex != 0 && fWaveBgTexW > 0 && fWaveBgTexH > 0)
-        {
-            const float waveW = x1 - x0;
-            const float waveH = y1 - y0;
-            const float imgAspect = (float)fWaveBgTexW / (float)fWaveBgTexH;
-
-            const float zoomY = 3.0f;
-            const float alpha = 0.45f;
-
-            const float drawH = waveH * zoomY;
-            const float drawW = drawH * imgAspect;
-
-            const float centerX = x0 + 0.5f * waveW;
-            const float centerY = y0 + 0.5f * waveH - 0.08f * drawH;
-
-            const float bx0 = centerX - 0.5f * drawW;
-            const float bx1 = centerX + 0.5f * drawW;
-            const float by0 = centerY - 0.5f * drawH;
-            const float by1 = centerY + 0.5f * drawH;
-
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, fWaveBgTex);
-            glColor4f(1.0f, 1.0f, 1.0f, alpha);
-            glBegin(GL_QUADS);
-                glTexCoord2f(0.0f, 1.0f); glVertex2f(bx0, by1);
-                glTexCoord2f(1.0f, 1.0f); glVertex2f(bx1, by1);
-                glTexCoord2f(1.0f, 0.0f); glVertex2f(bx1, by0);
-                glTexCoord2f(0.0f, 0.0f); glVertex2f(bx0, by0);
-            glEnd();
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glDisable(GL_TEXTURE_2D);
-        }
 
         glLineWidth(1.0f);
         glColor4f(0.86f, 0.65f, 0.26f, 1.0f);
@@ -811,102 +907,16 @@ void DrumCloudUI::onDisplay()
     {
         if (fLoadError) glColor4f(1.0f, 0.44f, 0.34f, 1.0f);
         else glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
-        drawPixelText(fLoadStatus.c_str(), 18.0f, 95.0f, 1.1f);
+        drawPixelText(fLoadStatus.c_str(), 26.0f, 158.0f, 1.05f);
     }
 
-    // Top Row Knobs (8 knapper)
-    const float r = 24.0f;
-    const float cy = 146.0f;
-    const float cx[8] = { 48.0f, 142.0f, 236.0f, 330.0f, 424.0f, 518.0f, 612.0f, 706.0f };
-    const uint32_t params[8] = { paramVolume, paramDensity, paramRelease, paramStartPosition, paramPositionSpread, paramScanSpeed, paramFilter, paramResonance };
-    const char* labels[8] = { "VOL", "DENS", "REL", "START", "SPREAD", "SCAN", "FILTER", "RESO" };
-
-    for (int i = 0; i < 8; ++i)
-    {
-        const float vmin = getParamMin(params[i]);
-        const float vmax = getParamMax(params[i]);
-        const float val  = getParamUiValue(params[i]);
-        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
-        
-        bool isHovered = (fHoverKnobParam == params[i]);
-        drawModernKnob(cx[i], cy, r, t, labels[i], isHovered);
-    }
-
-    // Bottom Row Knobs (9 KNAPPER MED RUMKLANG!)
-    const float r2 = 19.0f;
-    const float cy2 = 236.0f;
-    const float cx2[9] = { 45.0f, 130.0f, 215.0f, 300.0f, 385.0f, 470.0f, 555.0f, 640.0f, 725.0f };
-    const uint32_t params2[9] = { paramVelocityToDensity, paramVelocityToGrainSize, paramPitchRate, paramScanJumpRate, paramScanJumpAmount, paramScanJumpSmoothMs, paramSyncRate, paramReverbSize, paramReverbMix };
-    const char* labels2[9] = { "V DENS", "V GSIZ", "PITCH", "J RATE", "J AMNT", "J SMTH", "SYNC", "RVB SZ", "RVB MX" };
-
-    for (int i = 0; i < 9; ++i)
-    {
-        const float vmin = getParamMin(params2[i]);
-        const float vmax = getParamMax(params2[i]);
-        const float val  = getParamUiValue(params2[i]);
-        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
-
-        bool isHovered = (fHoverKnobParam == params2[i]);
-        drawModernKnob(cx2[i], cy2, r2, t, labels2[i], isHovered);
-    }
-
-    // v1.9 tuning and per-grain envelope controls.
-    const float r3 = 20.0f;
-    const float cy3 = 323.0f;
-    const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
-    const uint32_t params3[5] = {
-        paramRootNote, paramSampleFineTune, paramGrainAttack,
-        paramGrainRelease, paramTimeStretch
-    };
-    const char* labels3[5] = { "ROOT", "FINE", "G ATK", "G REL", "STRETCH" };
-
-    for (int i = 0; i < 5; ++i)
-    {
-        const float vmin = getParamMin(params3[i]);
-        const float vmax = getParamMax(params3[i]);
-        const float val = getParamUiValue(params3[i]);
-        const float t = (params3[i] == paramTimeStretch)
-            ? std::clamp((std::log2(std::max(0.25f, val)) + 2.0f) * 0.25f, 0.0f, 1.0f)
-            : ((vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f);
-        drawModernKnob(cx3[i], cy3, r3, t, labels3[i], fHoverKnobParam == params3[i]);
-    }
-
-    glColor4f(0.72f, 0.53f, 0.22f, 0.9f);
-    drawPixelText("PITCH", 124.0f, 282.0f, 1.15f);
-    drawPixelText("GRAIN ENVELOPE", 355.0f, 282.0f, 1.15f);
-    drawPixelText("TIME", 617.0f, 282.0f, 1.15f);
-
-    // Filtered stereo / ping-pong delay.
-    const float r4 = 19.0f;
-    const float cy4 = 412.0f;
-    const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
-    const uint32_t params4[6] = {
-        paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
-        paramDelayFeedback, paramDelayMix, paramDelayDamping
-    };
-    const char* labels4[6] = { "MODE", "TIME L", "TIME R", "FDBK", "MIX", "DAMP" };
-
-    for (int i = 0; i < 6; ++i)
-    {
-        const float vmin = getParamMin(params4[i]);
-        const float vmax = getParamMax(params4[i]);
-        const float val = getParamUiValue(params4[i]);
-        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
-        drawModernKnob(cx4[i], cy4, r4, t, labels4[i], fHoverKnobParam == params4[i]);
-    }
-
-    const char* delayModeName = "OFF";
-    if (int(std::lround(fDelayModeUi)) == 1) delayModeName = "STEREO";
-    else if (int(std::lround(fDelayModeUi)) == 2) delayModeName = "PING PONG";
-    char delayTitle[32];
-    std::snprintf(delayTitle, sizeof(delayTitle), "DELAY %s", delayModeName);
-    glColor4f(0.72f, 0.53f, 0.22f, 0.9f);
-    drawPixelText(delayTitle, 324.0f, 371.0f, 1.15f);
+    for (const DrumCloudKnobSpec& spec : kDrumCloudKnobs)
+        drawParameterKnob(spec);
 
     // Automatic pitch analysis controls and result.
     {
         const float bx0 = W - 258.0f;
-        const float by0 = 18.0f;
+        const float by0 = 60.0f;
         const float bw = 120.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
@@ -936,7 +946,7 @@ void DrumCloudUI::onDisplay()
             std::snprintf(pitchBuf, sizeof(pitchBuf), "ROOT LOW CONF");
 
         const float bx0 = W - 258.0f;
-        const float by0 = 46.0f;
+        const float by0 = 88.0f;
         const float bw = 120.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
@@ -960,7 +970,7 @@ void DrumCloudUI::onDisplay()
         char scanBuf[24];
         std::snprintf(scanBuf, sizeof(scanBuf), "SCAN %.2f", fScanPosUI);
         const float bx0 = W - 118.0f;
-        const float by0 = 46.0f;
+        const float by0 = 88.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
@@ -989,7 +999,7 @@ void DrumCloudUI::onDisplay()
         char modeBuf[20];
         std::snprintf(modeBuf, sizeof(modeBuf), "%s %d", modeName, fScanModeUi);
         const float bx0 = W - 118.0f;
-        const float by0 = 18.0f;
+        const float by0 = 60.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
@@ -1012,8 +1022,8 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
     const float mx = (float)ev.pos.getX();
     const float my = (float)ev.pos.getY();
 
-    const float wx0 = 12.0f;
-    const float wx1 = (float)getWidth() - 12.0f;
+    const float wx0 = 18.0f;
+    const float wx1 = (float)getWidth() - 18.0f;
 
     if (fDragSampleStart)
     {
@@ -1071,43 +1081,9 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
         return true;
     }
 
-    uint32_t hoverNow = 0xffffffffu;
-    if (!fDragKnob && !fDragStartPos && !fDragSampleStart && !fDragSampleEnd)
-    {
-        const float cy1 = 146.0f;
-        const float cx1[8] = { 48.0f, 142.0f, 236.0f, 330.0f, 424.0f, 518.0f, 612.0f, 706.0f };
-        const uint32_t p1[8] = { paramVolume, paramDensity, paramRelease, paramStartPosition, paramPositionSpread, paramScanSpeed, paramFilter, paramResonance };
-        for (int i = 0; i < 8; ++i) {
-            if (hitKnob(mx, my, cx1[i], cy1, 24.0f)) hoverNow = p1[i];
-        }
-
-        const float cy2 = 236.0f;
-        const float cx2[9] = { 45.0f, 130.0f, 215.0f, 300.0f, 385.0f, 470.0f, 555.0f, 640.0f, 725.0f };
-        const uint32_t p2[9] = { paramVelocityToDensity, paramVelocityToGrainSize, paramPitchRate, paramScanJumpRate, paramScanJumpAmount, paramScanJumpSmoothMs, paramSyncRate, paramReverbSize, paramReverbMix };
-        for (int i = 0; i < 9; ++i) {
-            if (hitKnob(mx, my, cx2[i], cy2, 19.0f)) hoverNow = p2[i];
-        }
-
-        const float cy3 = 323.0f;
-        const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
-        const uint32_t p3[5] = {
-            paramRootNote, paramSampleFineTune, paramGrainAttack,
-            paramGrainRelease, paramTimeStretch
-        };
-        for (int i = 0; i < 5; ++i) {
-            if (hitKnob(mx, my, cx3[i], cy3, 20.0f)) hoverNow = p3[i];
-        }
-
-        const float cy4 = 412.0f;
-        const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
-        const uint32_t p4[6] = {
-            paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
-            paramDelayFeedback, paramDelayMix, paramDelayDamping
-        };
-        for (int i = 0; i < 6; ++i) {
-            if (hitKnob(mx, my, cx4[i], cy4, 19.0f)) hoverNow = p4[i];
-        }
-    }
+    const uint32_t hoverNow = (!fDragKnob && !fDragStartPos && !fDragSampleStart && !fDragSampleEnd)
+        ? knobAt(mx, my)
+        : 0xffffffffu;
 
     if (fHoverKnobParam != hoverNow)
     {
@@ -1206,10 +1182,10 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 {
     const float mx = (float)ev.pos.getX();
     const float my = (float)ev.pos.getY();
-    const float wx0 = 12.0f;
-    const float wx1 = (float)getWidth() - 12.0f;
-    const float wy0 = 12.0f;
-    const float wy1 = 112.0f;
+    const float wx0 = 18.0f;
+    const float wx1 = (float)getWidth() - 18.0f;
+    const float wy0 = 52.0f;
+    const float wy1 = 176.0f;
     const bool hitWave = (mx >= wx0 && mx <= wx1 && my >= wy0 && my <= wy1);
     const bool hitStartPosZone = hitWave && (my >= (wy1 - 16.0f) && my <= wy1);
     const float regionStartX = wx0 + fSampleStartUi * (wx1 - wx0);
@@ -1220,7 +1196,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     if (ev.button == 1 && ev.press)
     {
         const float autoBx0 = (float)getWidth() - 258.0f;
-        const float autoBy0 = 18.0f;
+        const float autoBy0 = 60.0f;
         const float autoBw = 120.0f;
         const float autoBh = 22.0f;
         if (mx >= autoBx0 && mx <= autoBx0 + autoBw &&
@@ -1243,7 +1219,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
         }
 
         const float modeBx0 = (float)getWidth() - 118.0f;
-        const float modeBy0 = 18.0f;
+        const float modeBy0 = 60.0f;
         const float modeBw  = 90.0f;
         const float modeBh  = 22.0f;
 
@@ -1282,139 +1258,31 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float cy = 146.0f;
-        const float cx[8] = { 48.0f, 142.0f, 236.0f, 330.0f, 424.0f, 518.0f, 612.0f, 706.0f };
-        const uint32_t params[8] = { paramVolume, paramDensity, paramRelease, paramStartPosition, paramPositionSpread, paramScanSpeed, paramFilter, paramResonance };
-        for (int i = 0; i < 8; ++i)
+        const uint32_t knobParam = knobAt(mx, my);
+        if (knobParam != 0xffffffffu)
         {
-            if (hitKnob(mx, my, cx[i], cy, 24.0f))
-            {
-                auto now = std::chrono::steady_clock::now();
-                bool isDoubleClick = (fLastClickParam == params[i]) && 
-                    (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
-                
-                fLastClickTime = now;
-                fLastClickParam = params[i];
-
-                if (isDoubleClick) {
-                    float defVal = getParamDef(params[i]);
-                    editParameter(params[i], true);
-                    setParamUiValue(params[i], defVal);
-                    setParameterValue(params[i], defVal);
-                    editParameter(params[i], false);
-                    repaint();
-                } else {
-                    fDragKnob = true;
-                    fDragKnobParam = params[i];
-                    fKnobDragStartX = mx;
-                    fKnobDragStartValue = getParamUiValue(params[i]);
-                    editParameter(params[i], true);
-                }
-                return true;
-            }
-        }
-
-        const float cy2 = 236.0f;
-        const float cx2[9] = { 45.0f, 130.0f, 215.0f, 300.0f, 385.0f, 470.0f, 555.0f, 640.0f, 725.0f };
-        const uint32_t params2[9] = { paramVelocityToDensity, paramVelocityToGrainSize, paramPitchRate, paramScanJumpRate, paramScanJumpAmount, paramScanJumpSmoothMs, paramSyncRate, paramReverbSize, paramReverbMix };
-        for (int i = 0; i < 9; ++i)
-        {
-            if (hitKnob(mx, my, cx2[i], cy2, 19.0f))
-            {
-                auto now = std::chrono::steady_clock::now();
-                bool isDoubleClick = (fLastClickParam == params2[i]) && 
-                    (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
-                
-                fLastClickTime = now;
-                fLastClickParam = params2[i];
-
-                if (isDoubleClick) {
-                    float defVal = getParamDef(params2[i]);
-                    editParameter(params2[i], true);
-                    setParamUiValue(params2[i], defVal);
-                    setParameterValue(params2[i], defVal);
-                    editParameter(params2[i], false);
-                    repaint();
-                } else {
-                    fDragKnob = true;
-                    fDragKnobParam = params2[i];
-                    fKnobDragStartX = mx;
-                    fKnobDragStartValue = getParamUiValue(params2[i]);
-                    editParameter(params2[i], true);
-                }
-                return true;
-            }
-        }
-
-        const float cy3 = 323.0f;
-        const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
-        const uint32_t params3[5] = {
-            paramRootNote, paramSampleFineTune, paramGrainAttack,
-            paramGrainRelease, paramTimeStretch
-        };
-        for (int i = 0; i < 5; ++i)
-        {
-            if (hitKnob(mx, my, cx3[i], cy3, 20.0f))
-            {
-                const auto now = std::chrono::steady_clock::now();
-                const bool isDoubleClick = (fLastClickParam == params3[i]) &&
-                    (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
-                fLastClickTime = now;
-                fLastClickParam = params3[i];
-
-                if (isDoubleClick)
-                {
-                    const float defVal = getParamDef(params3[i]);
-                    editParameter(params3[i], true);
-                    setParamUiValue(params3[i], defVal);
-                    setParameterValue(params3[i], defVal);
-                    editParameter(params3[i], false);
-                    repaint();
-                }
-                else
-                {
-                    fDragKnob = true;
-                    fDragKnobParam = params3[i];
-                    fKnobDragStartX = mx;
-                    fKnobDragStartValue = getParamUiValue(params3[i]);
-                    editParameter(params3[i], true);
-                }
-                return true;
-            }
-        }
-
-        const float cy4 = 412.0f;
-        const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
-        const uint32_t params4[6] = {
-            paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
-            paramDelayFeedback, paramDelayMix, paramDelayDamping
-        };
-        for (int i = 0; i < 6; ++i)
-        {
-            if (!hitKnob(mx, my, cx4[i], cy4, 19.0f)) continue;
-
             const auto now = std::chrono::steady_clock::now();
-            const bool isDoubleClick = (fLastClickParam == params4[i]) &&
+            const bool isDoubleClick = (fLastClickParam == knobParam) &&
                 (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
             fLastClickTime = now;
-            fLastClickParam = params4[i];
+            fLastClickParam = knobParam;
 
             if (isDoubleClick)
             {
-                const float defVal = getParamDef(params4[i]);
-                editParameter(params4[i], true);
-                setParamUiValue(params4[i], defVal);
-                setParameterValue(params4[i], defVal);
-                editParameter(params4[i], false);
+                const float defVal = getParamDef(knobParam);
+                editParameter(knobParam, true);
+                setParamUiValue(knobParam, defVal);
+                setParameterValue(knobParam, defVal);
+                editParameter(knobParam, false);
                 repaint();
             }
             else
             {
                 fDragKnob = true;
-                fDragKnobParam = params4[i];
+                fDragKnobParam = knobParam;
                 fKnobDragStartX = mx;
-                fKnobDragStartValue = getParamUiValue(params4[i]);
-                editParameter(params4[i], true);
+                fKnobDragStartValue = getParamUiValue(knobParam);
+                editParameter(knobParam, true);
             }
             return true;
         }
