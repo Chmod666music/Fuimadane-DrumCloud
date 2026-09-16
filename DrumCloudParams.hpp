@@ -32,5 +32,11 @@ enum DrumCloudParams
     paramSampleStart,
     paramSampleEnd,
     paramAutoRoot,
+    paramDelayMode,
+    paramDelayTimeLeft,
+    paramDelayTimeRight,
+    paramDelayFeedback,
+    paramDelayMix,
+    paramDelayDamping,
     paramCount
 };
