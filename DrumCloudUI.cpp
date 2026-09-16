@@ -32,6 +32,9 @@ namespace DISTRHO {
 
 extern std::atomic<float> gDrumCloudUiScanPos;
 extern std::atomic<int>   gDrumCloudUiScanMode;
+static constexpr uint32_t kUiGrainMarkerCount = 16;
+extern std::atomic<uint32_t> gDrumCloudUiGrainCount;
+extern std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
 
 static constexpr uint32_t kMax24 = 0xFFFFFFu;
 
@@ -122,6 +125,8 @@ private:
 
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
+    float fGrainPosUI[kUiGrainMarkerCount]{};
+    uint32_t fGrainCountUI = 0;
     
     // UI Parameter values
     float fVolumeUi = 0.8f;
@@ -145,6 +150,8 @@ private:
     float fSampleFineTuneUi = 0.0f;
     float fGrainAttackMsUi = 10.0f;
     float fGrainReleaseMsUi = 80.0f;
+    float fSampleStartUi = 0.0f;
+    float fSampleEndUi = 1.0f;
 
     // Interaction states
     bool  fDragKnob = false;
@@ -152,6 +159,8 @@ private:
     float fKnobDragStartX = 0.0f;
     float fKnobDragStartValue = 0.0f;
     bool  fDragStartPos = false;
+    bool  fDragSampleStart = false;
+    bool  fDragSampleEnd = false;
     
     // Hover & Double click
     uint32_t fHoverKnobParam = 0xffffffffu;
@@ -223,6 +232,8 @@ float DrumCloudUI::getParamMin(uint32_t param) const
         case paramSampleFineTune: return -100.0f;
         case paramGrainAttack: return 0.0f;
         case paramGrainRelease: return 0.0f;
+        case paramSampleStart: return 0.0f;
+        case paramSampleEnd: return 0.0f;
         default: return 0.0f;
     }
 }
@@ -251,6 +262,8 @@ float DrumCloudUI::getParamMax(uint32_t param) const
         case paramSampleFineTune: return 100.0f;
         case paramGrainAttack: return 500.0f;
         case paramGrainRelease: return 1000.0f;
+        case paramSampleStart: return 1.0f;
+        case paramSampleEnd: return 1.0f;
         default: return 1.0f;
     }
 }
@@ -279,6 +292,8 @@ float DrumCloudUI::getParamDef(uint32_t param) const
         case paramSampleFineTune: return 0.0f;
         case paramGrainAttack: return 10.0f;
         case paramGrainRelease: return 80.0f;
+        case paramSampleStart: return 0.0f;
+        case paramSampleEnd: return 1.0f;
         default: return 0.0f;
     }
 }
@@ -307,6 +322,8 @@ float DrumCloudUI::getParamUiValue(uint32_t param) const
         case paramSampleFineTune: return fSampleFineTuneUi;
         case paramGrainAttack: return fGrainAttackMsUi;
         case paramGrainRelease: return fGrainReleaseMsUi;
+        case paramSampleStart: return fSampleStartUi;
+        case paramSampleEnd: return fSampleEndUi;
         default: return 0.0f;
     }
 }
@@ -335,6 +352,8 @@ void DrumCloudUI::setParamUiValue(uint32_t param, float value)
         case paramSampleFineTune: fSampleFineTuneUi = value; break;
         case paramGrainAttack: fGrainAttackMsUi = value; break;
         case paramGrainRelease: fGrainReleaseMsUi = value; break;
+        case paramSampleStart: fSampleStartUi = value; break;
+        case paramSampleEnd: fSampleEndUi = value; break;
         default: break;
     }
 }
@@ -636,10 +655,29 @@ void DrumCloudUI::onDisplay()
         }
         glEnd();
 
-        const float startX = x0 + fStartPosUi * (x1 - x0);
-        const float halfW = 0.5f * fSpreadUi * (x1 - x0);
-        const float sx0 = std::max(x0, startX - halfW);
-        const float sx1 = std::min(x1, startX + halfW);
+        const float regionStartX = x0 + std::clamp(fSampleStartUi, 0.0f, 1.0f) * (x1 - x0);
+        const float regionEndX = x0 + std::clamp(fSampleEndUi, 0.0f, 1.0f) * (x1 - x0);
+
+        // Dim audio outside the playable region and draw draggable gold handles.
+        glColor4f(0.015f, 0.012f, 0.010f, 0.72f);
+        glBegin(GL_QUADS);
+            glVertex2f(x0, y0); glVertex2f(regionStartX, y0);
+            glVertex2f(regionStartX, y1); glVertex2f(x0, y1);
+            glVertex2f(regionEndX, y0); glVertex2f(x1, y0);
+            glVertex2f(x1, y1); glVertex2f(regionEndX, y1);
+        glEnd();
+
+        glLineWidth(2.0f);
+        glColor4f(0.96f, 0.68f, 0.18f, 0.98f);
+        glBegin(GL_LINES);
+            glVertex2f(regionStartX, y0); glVertex2f(regionStartX, y1);
+            glVertex2f(regionEndX, y0); glVertex2f(regionEndX, y1);
+        glEnd();
+
+        const float startX = regionStartX + fStartPosUi * (regionEndX - regionStartX);
+        const float halfW = 0.5f * fSpreadUi * (regionEndX - regionStartX);
+        const float sx0 = std::max(regionStartX, startX - halfW);
+        const float sx1 = std::min(regionEndX, startX + halfW);
 
         if (fSpreadUi > 0.0001f)
         {
@@ -684,6 +722,19 @@ void DrumCloudUI::onDisplay()
                 glVertex2f(startX + 4.0f, y0 - 8.0f);
             glEnd();
         }
+
+        // Individual active grains: warm coral, deliberately distinct from cyan scan.
+        const uint32_t visibleGrains = std::min<uint32_t>(fGrainCountUI, kUiGrainMarkerCount);
+        glLineWidth(1.0f);
+        glColor4f(1.0f, 0.32f, 0.12f, 0.78f);
+        glBegin(GL_LINES);
+        for (uint32_t i = 0; i < visibleGrains; ++i)
+        {
+            const float gx = x0 + std::clamp(fGrainPosUI[i], 0.0f, 1.0f) * (x1 - x0);
+            glVertex2f(gx, y0 + 5.0f);
+            glVertex2f(gx, y1 - 5.0f);
+        }
+        glEnd();
 
         glLineWidth(6.0f);
         glColor4f(0.20f, 0.85f, 1.0f, 0.18f);
@@ -820,11 +871,34 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
     const float mx = (float)ev.pos.getX();
     const float my = (float)ev.pos.getY();
 
+    const float wx0 = 12.0f;
+    const float wx1 = (float)getWidth() - 12.0f;
+
+    if (fDragSampleStart)
+    {
+        float norm = (wx1 > wx0) ? (mx - wx0) / (wx1 - wx0) : 0.0f;
+        norm = std::clamp(norm, 0.0f, fSampleEndUi - 0.001f);
+        fSampleStartUi = norm;
+        setParameterValue(paramSampleStart, norm);
+        repaint();
+        return true;
+    }
+
+    if (fDragSampleEnd)
+    {
+        float norm = (wx1 > wx0) ? (mx - wx0) / (wx1 - wx0) : 1.0f;
+        norm = std::clamp(norm, fSampleStartUi + 0.001f, 1.0f);
+        fSampleEndUi = norm;
+        setParameterValue(paramSampleEnd, norm);
+        repaint();
+        return true;
+    }
+
     if (fDragStartPos)
     {
-        const float wx0 = 12.0f;
-        const float wx1 = (float)getWidth() - 12.0f;
-        float norm = (wx1 > wx0) ? (mx - wx0) / (wx1 - wx0) : 0.0f;
+        const float regionX0 = wx0 + fSampleStartUi * (wx1 - wx0);
+        const float regionX1 = wx0 + fSampleEndUi * (wx1 - wx0);
+        float norm = (regionX1 > regionX0) ? (mx - regionX0) / (regionX1 - regionX0) : 0.0f;
         norm = std::clamp(norm, 0.0f, 1.0f);
         if (norm < 0.005f) norm = 0.0f;
         fStartPosUi = norm;
@@ -847,7 +921,7 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
     }
 
     uint32_t hoverNow = 0xffffffffu;
-    if (!fDragKnob && !fDragStartPos)
+    if (!fDragKnob && !fDragStartPos && !fDragSampleStart && !fDragSampleEnd)
     {
         const float cy1 = 146.0f;
         const float cx1[8] = { 48.0f, 142.0f, 236.0f, 330.0f, 424.0f, 518.0f, 612.0f, 706.0f };
@@ -916,9 +990,31 @@ void DrumCloudUI::uiIdle()
     }
     const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
 
+    bool grainChanged = false;
+    const uint32_t grainCount = std::min<uint32_t>(
+        gDrumCloudUiGrainCount.load(std::memory_order_acquire), kUiGrainMarkerCount);
+    if (grainCount != fGrainCountUI)
+    {
+        fGrainCountUI = grainCount;
+        grainChanged = true;
+    }
+    for (uint32_t i = 0; i < grainCount; ++i)
+    {
+        const float pos = std::clamp(gDrumCloudUiGrainPos[i].load(std::memory_order_relaxed), 0.0f, 1.0f);
+        if (std::fabs(pos - fGrainPosUI[i]) > 0.0005f)
+        {
+            fGrainPosUI[i] = pos;
+            grainChanged = true;
+        }
+    }
+
     if (std::fabs(scan - fScanPosUI) > 0.0005f)
     {
         fScanPosUI = scan;
+        repaint();
+    }
+    else if (grainChanged)
+    {
         repaint();
     }
 }
@@ -933,6 +1029,10 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     const float wy1 = 112.0f;
     const bool hitWave = (mx >= wx0 && mx <= wx1 && my >= wy0 && my <= wy1);
     const bool hitStartPosZone = hitWave && (my >= (wy1 - 16.0f) && my <= wy1);
+    const float regionStartX = wx0 + fSampleStartUi * (wx1 - wx0);
+    const float regionEndX = wx0 + fSampleEndUi * (wx1 - wx0);
+    const bool hitSampleStart = hitWave && std::fabs(mx - regionStartX) <= 7.0f;
+    const bool hitSampleEnd = hitWave && std::fabs(mx - regionEndX) <= 7.0f;
 
     if (ev.button == 1 && ev.press)
     {
@@ -953,10 +1053,20 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
     
+        if (hitSampleStart || hitSampleEnd)
+        {
+            const bool chooseStart = hitSampleStart &&
+                (!hitSampleEnd || std::fabs(mx - regionStartX) <= std::fabs(mx - regionEndX));
+            fDragSampleStart = chooseStart;
+            fDragSampleEnd = !chooseStart;
+            editParameter(chooseStart ? paramSampleStart : paramSampleEnd, true);
+            return true;
+        }
+
         if (hitStartPosZone)
         {
             fDragStartPos = true;
-            float norm = (wx1 > wx0) ? (mx - wx0) / (wx1 - wx0) : 0.0f;
+            float norm = (regionEndX > regionStartX) ? (mx - regionStartX) / (regionEndX - regionStartX) : 0.0f;
             norm = std::clamp(norm, 0.0f, 1.0f);
             if (norm < 0.005f) norm = 0.0f;
             fStartPosUi = norm;
@@ -1088,6 +1198,18 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             fDragStartPos = false;
             return true;
         }
+        if (fDragSampleStart)
+        {
+            editParameter(paramSampleStart, false);
+            fDragSampleStart = false;
+            return true;
+        }
+        if (fDragSampleEnd)
+        {
+            editParameter(paramSampleEnd, false);
+            fDragSampleEnd = false;
+            return true;
+        }
     }
 
     return false;
@@ -1147,6 +1269,8 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramSampleFineTune) { fSampleFineTuneUi = value; repaint(); return; }
     if (index == paramGrainAttack) { fGrainAttackMsUi = value; repaint(); return; }
     if (index == paramGrainRelease) { fGrainReleaseMsUi = value; repaint(); return; }
+    if (index == paramSampleStart) { fSampleStartUi = value; repaint(); return; }
+    if (index == paramSampleEnd) { fSampleEndUi = value; repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }

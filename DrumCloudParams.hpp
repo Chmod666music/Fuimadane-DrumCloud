@@ -29,5 +29,7 @@ enum DrumCloudParams
     paramSampleFineTune,
     paramGrainAttack,
     paramGrainRelease,
+    paramSampleStart,
+    paramSampleEnd,
     paramCount
 };
