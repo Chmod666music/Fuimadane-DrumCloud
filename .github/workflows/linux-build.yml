@@ -20,13 +20,16 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev libx11-dev libxcursor-dev libxext-dev libxrandr-dev libxinerama-dev libasound2-dev libjack-jackd2-dev
+          sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev libx11-dev libxcursor-dev libxext-dev libxrandr-dev libxinerama-dev libasound2-dev libjack-jackd2-dev ffmpeg
       - name: Verify checked-in artwork matches source PNG
         run: |
           python3 tools/embed-artwork.py
           git diff --exit-code -- ArtworkData.hpp
       - name: Test bounded audio loading
         run: |
+          ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=440:sample_rate=48000:duration=1' -ac 2 -c:a pcm_s16le codec.wav
+          ffmpeg -hide_banner -loglevel error -i codec.wav -c:a flac codec.flac
+          ffmpeg -hide_banner -loglevel error -i codec.wav -c:a libmp3lame codec.mp3
           g++ -std=gnu++17 -O2 -Wall -Wextra tests/audio_loader.cpp AudioFileLoader.cpp -o /tmp/drumcloud-audio-loader-test
           /tmp/drumcloud-audio-loader-test
       - name: Build CLAP and VST3

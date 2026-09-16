@@ -40,7 +40,8 @@ static void wav(const char* path, uint32_t frames, bool sparse)
 int main()
 {
     wav("small.wav", 4, false);
-    wav("oversized.wav", 8000001, true);
+    wav("formerly_too_long.wav", 9000000, true);
+    wav("oversized.wav", 16000001, true);
     LoadedAudio audio;
     std::string error;
     assert(loadAudioFileToFloat("small.wav", audio, &error));
@@ -48,15 +49,33 @@ int main()
     assert(audio.interleaved.size() == 8);
     assert(std::fabs(audio.interleaved[0] - 0.5f) < 0.001f);
     assert(std::fabs(audio.interleaved[1] + 0.5f) < 0.001f);
+    AudioPreview preview;
+    assert(loadAudioFilePreview("small.wav", preview, &error));
+    assert(preview.frames == 4 && preview.channels == 2);
+    assert(std::fabs(preview.max[0] - 0.5f) < 0.001f);
+    assert(loadAudioFileToFloat("formerly_too_long.wav", audio, &error));
+    assert(audio.frames == 9000000);
+    assert(loadAudioFilePreview("formerly_too_long.wav", preview, &error));
+    assert(preview.frames == 9000000);
     assert(!loadAudioFileToFloat("oversized.wav", audio, &error));
     assert(error.find("limit") != std::string::npos);
+    assert(!loadAudioFilePreview("oversized.wav", preview, &error));
+    assert(error.find("limit") != std::string::npos);
+    assert(loadAudioFilePreview("codec.flac", preview, &error));
+    assert(preview.channels == 2 && preview.frames > 40000);
+    assert(loadAudioFileToFloat("codec.flac", audio, &error));
+    assert(loadAudioFilePreview("codec.mp3", preview, &error));
+    assert(preview.channels == 2 && preview.frames > 40000);
+    assert(loadAudioFileToFloat("codec.mp3", audio, &error));
     assert(!loadAudioFileToFloat("missing.wav", audio, &error));
     {
         std::ofstream broken("broken.wav", std::ios::binary);
         broken.write("not a wave", 10);
     }
     assert(!loadAudioFileToFloat("broken.wav", audio, &error));
+    assert(!loadAudioFilePreview("broken.wav", preview, &error));
     std::remove("broken.wav");
     std::remove("small.wav");
+    std::remove("formerly_too_long.wav");
     std::remove("oversized.wav");
 }
