@@ -28,9 +28,9 @@ Windows may show a SmartScreen warning because beta artifacts are not code
 signed. Do not disable system-wide security controls. Only continue when the
 artifact came directly from this repository's GitHub Actions run.
 
-## macOS Intel and Apple Silicon
+## macOS 10.15+ Intel and Apple Silicon
 
-The `macos-universal` artifact contains an unsigned installer package with
+The `macos-10.15` artifact contains an unsigned installer package with
 universal CLAP, VST3 and AU bundles. It targets both Intel and Apple Silicon.
 The installer uses the system-wide plugin folders:
 
@@ -68,7 +68,7 @@ artifact name and commit SHA. Do not share private samples or credentials.
 | Platform | Architecture | Formats built | Build | Host validation |
 |---|---|---|---|---|
 | Windows 10/11 | x86-64 | CLAP, VST3 | Pending CI | Pending testers |
-| macOS | Universal: Intel + Apple Silicon | CLAP, VST3, AU | Pending CI | Pending testers |
+| macOS 10.15+ | Universal: Intel + Apple Silicon | CLAP, VST3, AU | Pending CI | Pending testers |
 
 Signing, notarization and an end-user installer/release archive are separate
 release-engineering tasks and are not implied by this beta workflow.
