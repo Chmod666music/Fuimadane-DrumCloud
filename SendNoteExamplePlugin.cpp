@@ -20,6 +20,7 @@
 #include "AudioFileLoader.hpp"
 #include "PitchDetector.hpp"
 #include "FilteredStereoDelay.hpp"
+#include "PolyphonicNoteState.hpp"
 
 // 👇 SÆT FILTER-KLASSEN IND HER 👇
 struct SvfStereo {
@@ -517,7 +518,7 @@ public:
     {
         // Retire grains referencing the old sample, while keeping held MIDI notes.
         activeCount = 0;
-        fSpawnAcc = 0.0f;
+        fNotes.clearSpawnPhases();
         for (int i = 0; i < kMaxGrains; ++i) grains[i].active = false;
         sampleL.swap(prepared.left);
         sampleR.swap(prepared.right);
@@ -532,18 +533,8 @@ public:
 
 void reset()
 {
-    // NOTE state
-    std::memset(noteIsHeld, 0, sizeof(noteIsHeld));
-    lastNoteOn  = 60;
-    lastNoteOff = 0;
-
-    // Tail / spawn state
-    fSpawnAcc    = 0.0f;
-    fReleaseLeft = 0;
-
-    // Current note (for mono behavior)
-    fCurrentNote = 60;
-    fCurrentVel  = 100;
+    // Independent state for all 128 MIDI notes.
+    fNotes.reset();
 
     // Active grain bookkeeping
     activeCount = 0;
@@ -561,7 +552,7 @@ void reset()
         for (int i = 0; i < kMaxGrains; ++i)
             if (grains[i].active)
                 return false;
-        return fReleaseLeft <= 0;
+        return !fNotes.anyActive();
     }
 
 
@@ -824,39 +815,16 @@ void setTempoSyncPhase(float phase) noexcept
 
 void trigger(int note, int vel)
 {
-    lastNoteOn = uint8_t(note & 0x7F);
-    noteIsHeld[lastNoteOn] = true;
+    const uint8_t midiNote = uint8_t(note & 0x7F);
+    const uint8_t velocity = uint8_t(vel & 0x7F);
+    fNotes.noteOn(midiNote, velocity);
 
-    fCurrentNote = lastNoteOn;
-    fCurrentVel  = uint8_t(vel & 0x7F);
-    fReleaseLeft = 0;
-
-    // Chromatic sample mapping: the root key plays at the sample's original pitch.
-    // Fine tune is expressed in cents, and sample-rate compensation keeps pitch
-    // correct when the file and host use different sample rates.
-    const float semitones = (float(note) - fRootNote) + fSampleFineTuneCents / 100.0f;
-    const float sampleRateRatio = (sampleSR > 0 && sr > 0.0f)
-        ? float(sampleSR) / sr
-        : 1.0f;
-    fPitchRate = fPitchRateParam * std::pow(2.0f, semitones / 12.0f) * sampleRateRatio;
-
-    // velocity -> density (blend with base density knob)
-    const float velNorm   = float(vel) / 127.0f;
-    const float velShaped = velNorm * velNorm;
-    fDensityNorm = std::clamp(
-        fBaseDensityNorm * (1.0f - fVelToDensity) + velShaped * fVelToDensity,
-        0.0f, 1.0f
-    );
-    updateDensityFromNorm();
-
-    // burst ved NOTE-ON
+    // Each note receives its own burst and then its own continuous grain stream.
     const float burstWindowSec = 0.030f;
-    int burst = int(std::round(fGrainsPerSec * burstWindowSec));
-    if (burst < 2) burst = 2;
-    if (burst > 3) burst = 3;
-
+    int burst = int(std::round(grainsPerSecondForVelocity(velocity) * burstWindowSec));
+    burst = std::clamp(burst, 2, 3);
     for (int i = 0; i < burst; ++i)
-        spawnOneGrain(note, vel, 1.0f);
+        spawnOneGrain(midiNote, velocity, 1.0f);
 }
  // ✅ VIGTIG: trigger slutter her
 
@@ -866,24 +834,18 @@ void trigger(int note, int vel)
 
     void noteOff(int note)
 {
-    lastNoteOff = uint8_t(note & 0x7F);
-    noteIsHeld[lastNoteOff] = false;
-
-    // tail-spawn (valgfrit om du vil gate den)
-    if (lastNoteOff == fCurrentNote)
-        fReleaseLeft = int32_t((fReleaseMs * 0.001f) * sr);
-
-    const int32_t relSamples = int32_t((fReleaseMs * 0.001f) * sr);
-    const float dec = (relSamples > 1) ? (1.0f / float(relSamples)) : 1.0f;
+    const uint8_t midiNote = uint8_t(note & 0x7F);
+    const int32_t relSamples = std::max<int32_t>(1, int32_t((fReleaseMs * 0.001f) * sr));
+    fNotes.noteOff(midiNote, relSamples);
+    const float dec = 1.0f / float(relSamples);
 
     DCLOG("[noteOff] note=%d relSamples=%d activeCount=%d\n",
-          int(lastNoteOff), int(relSamples), int(activeCount));
+          int(midiNote), int(relSamples), int(activeCount));
 
     for (int i = 0; i < activeCount; ++i)
     {
         Grain& g = grains[activeIdx[i]];
-
-        if (g.active && g.note == lastNoteOff && !g.releasing)
+        if (g.active && g.note == midiNote && !g.releasing)
         {
             g.releasing = true;
             g.rel = 1.0f;
@@ -974,45 +936,22 @@ void process(float* outL, float* outR, uint32_t frames)
         float l = 0.0f;
         float r = 0.0f;
 
-        // ----- continuous spawn (tail) -----
-        const bool held = noteIsHeld[fCurrentNote];
-        const bool tail = (!held && fReleaseLeft > 0);
-
-        float tailMul = 1.0f;
-
-    if (tail)
-{
-    const float total = (fReleaseMs * 0.001f) * sr;
-    tailMul = (total > 1.0f) ? (float(fReleaseLeft) / total) : 0.0f;
-    tailMul = std::clamp(tailMul, 0.0f, 1.0f);
-    tailMul = std::sqrt(tailMul); // keep more energy in the tail
-
-}
-    
-
-    
-
-
-    
-
-
-
-
-        if (held || tail)
+        // Every held/releasing MIDI note owns an independent grain clock.
+        const int32_t totalRelease = std::max<int32_t>(1, int32_t((fReleaseMs * 0.001f) * sr));
+        for (uint32_t note = 0; note < 128; ++note)
         {
-            const float gps = fGrainsPerSec * tailMul;
-            fSpawnAcc += gps / sr;
+            const uint8_t midiNote = uint8_t(note);
+            if (!fNotes.isActive(midiNote)) continue;
 
-            while (fSpawnAcc >= 1.0f)
-            {
-                fSpawnAcc -= 1.0f;
-                spawnOneGrain(fCurrentNote, fCurrentVel, tailMul);
-            }
+            const uint8_t velocity = fNotes.velocity(midiNote);
+            const float voiceGain = fNotes.tailGain(midiNote, totalRelease);
+            const float gps = grainsPerSecondForVelocity(velocity) * voiceGain;
+            const int spawnCount = fNotes.advanceSpawn(midiNote, gps / sr);
+            for (int spawn = 0; spawn < spawnCount; ++spawn)
+                spawnOneGrain(midiNote, velocity, voiceGain);
+
+            fNotes.advanceRelease(midiNote);
         }
-
-        if (tail)
-            --fReleaseLeft;
-        // ----- end continuous spawn -----
 
         int i = 0;
         while (i < activeCount)
@@ -1144,21 +1083,25 @@ int sampleLen = 0;
 
 
 private:
+static float densityNormToGps(float densityNorm) noexcept
+{
+    const float n = std::clamp(densityNorm, 0.0f, 1.0f);
+    return 0.2f + (10.0f - 0.2f) * std::pow(n, 1.8f);
+}
+
+float grainsPerSecondForVelocity(uint8_t velocity) const noexcept
+{
+    const float velNorm = float(velocity) / 127.0f;
+    const float velShaped = velNorm * velNorm;
+    const float density = std::clamp(
+        fBaseDensityNorm * (1.0f - fVelToDensity) + velShaped * fVelToDensity,
+        0.0f, 1.0f);
+    return densityNormToGps(density);
+}
+
 void updateDensityFromNorm()
 {
-    // Shaped density curve:
-    // low end stays gentle for pads/ambient,
-    // high end ramps up more dramatically for cloud mode.
-    const float minD = 0.2f;
-    const float maxD = 10.0f;
-
-    const float n = std::clamp(fDensityNorm, 0.0f, 1.0f);
-    const float shaped = std::pow(n, 1.8f);
-
-    fGrainsPerSec = minD + (maxD - minD) * shaped;
-
-    if (fGrainsPerSec < 0.001f)
-        fGrainsPerSec = 0.001f;
+    fGrainsPerSec = densityNormToGps(fDensityNorm);
 }
 
 void updateScanSlewCoeff()
@@ -1744,7 +1687,11 @@ else
     if (densityMul >= 0.95f)
         g.amp *= 1.18f;
 
-    g.step = fPitchRate;
+    const float noteSemitones = (float(note) - fRootNote) + fSampleFineTuneCents / 100.0f;
+    const float sampleRateRatio = (sampleSR > 0 && sr > 0.0f)
+        ? float(sampleSR) / sr
+        : 1.0f;
+    g.step = fPitchRateParam * std::pow(2.0f, noteSemitones / 12.0f) * sampleRateRatio;
 
     const float semis  = (frand01(rng) - 0.5f) * 1.0f;
     const float detune = std::pow(2.0f, semis / 12.0f);
@@ -1778,15 +1725,12 @@ private:
     };
 
     float sr = 48000.0f;
-    float fPitchRate = 1.0f;
     float fPitchRateParam = 1.0f;
     float fRootNote = 60.0f;
     float fSampleFineTuneCents = 0.0f;
     float fGrainAttackMs = 10.0f;
     float fGrainReleaseMs = 80.0f;
-    bool noteIsHeld[128]{};
-    uint8_t lastNoteOn  = 60;
-    uint8_t lastNoteOff = 0;
+    PolyphonicNoteState fNotes;
 
     static constexpr int kMaxLoop = 48000 * 4;
     float loopL[kMaxLoop]{};
@@ -1837,10 +1781,6 @@ private:
 
     float win[kWinSize]{};
     float fReleaseMs = 3000.0f;
-    float   fSpawnAcc = 0.0f;
-    int32_t fReleaseLeft = 0;
-    uint8_t fCurrentNote = 60;
-    uint8_t fCurrentVel  = 100;
 
     static constexpr int kWavePreviewSize = 1024;
     float waveMin[kWavePreviewSize]{};
