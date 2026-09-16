@@ -32,6 +32,10 @@ jobs:
           ffmpeg -hide_banner -loglevel error -i codec.wav -c:a libmp3lame codec.mp3
           g++ -std=gnu++17 -O2 -Wall -Wextra tests/audio_loader.cpp AudioFileLoader.cpp -o /tmp/drumcloud-audio-loader-test
           /tmp/drumcloud-audio-loader-test
+      - name: Test automatic root and fine-tune detection
+        run: |
+          g++ -std=gnu++17 -O2 -Wall -Wextra tests/pitch_detector.cpp PitchDetector.cpp -I. -o /tmp/drumcloud-pitch-detector-test
+          /tmp/drumcloud-pitch-detector-test
       - name: Build CLAP and VST3
         run: |
           ./build.sh

@@ -1,5 +1,5 @@
 NAME = d_drumcloud
-FILES_DSP = SendNoteExamplePlugin.cpp AudioFileLoader.cpp
+FILES_DSP = SendNoteExamplePlugin.cpp AudioFileLoader.cpp PitchDetector.cpp
 FILES_UI = DrumCloudUI.cpp AudioFileLoader.cpp
 UI_TYPE = opengl
 CXXFLAGS += -std=gnu++17

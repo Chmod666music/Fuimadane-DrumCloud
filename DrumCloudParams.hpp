@@ -31,5 +31,6 @@ enum DrumCloudParams
     paramGrainRelease,
     paramSampleStart,
     paramSampleEnd,
+    paramAutoRoot,
     paramCount
 };

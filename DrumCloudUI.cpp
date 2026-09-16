@@ -35,6 +35,10 @@ extern std::atomic<int>   gDrumCloudUiScanMode;
 static constexpr uint32_t kUiGrainMarkerCount = 16;
 extern std::atomic<uint32_t> gDrumCloudUiGrainCount;
 extern std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
+extern std::atomic<uint32_t> gDrumCloudDetectedPitchGeneration;
+extern std::atomic<int> gDrumCloudDetectedRoot;
+extern std::atomic<float> gDrumCloudDetectedFine;
+extern std::atomic<float> gDrumCloudDetectedConfidence;
 
 static constexpr uint32_t kMax24 = 0xFFFFFFu;
 
@@ -152,6 +156,11 @@ private:
     float fGrainReleaseMsUi = 80.0f;
     float fSampleStartUi = 0.0f;
     float fSampleEndUi = 1.0f;
+    float fAutoRootUi = 1.0f;
+    int fDetectedRootUi = -1;
+    float fDetectedFineUi = 0.0f;
+    float fDetectedConfidenceUi = 0.0f;
+    uint32_t fDetectedPitchGenerationUi = 0;
 
     // Interaction states
     bool  fDragKnob = false;
@@ -234,6 +243,7 @@ float DrumCloudUI::getParamMin(uint32_t param) const
         case paramGrainRelease: return 0.0f;
         case paramSampleStart: return 0.0f;
         case paramSampleEnd: return 0.0f;
+        case paramAutoRoot: return 0.0f;
         default: return 0.0f;
     }
 }
@@ -264,6 +274,7 @@ float DrumCloudUI::getParamMax(uint32_t param) const
         case paramGrainRelease: return 1000.0f;
         case paramSampleStart: return 1.0f;
         case paramSampleEnd: return 1.0f;
+        case paramAutoRoot: return 1.0f;
         default: return 1.0f;
     }
 }
@@ -294,6 +305,7 @@ float DrumCloudUI::getParamDef(uint32_t param) const
         case paramGrainRelease: return 80.0f;
         case paramSampleStart: return 0.0f;
         case paramSampleEnd: return 1.0f;
+        case paramAutoRoot: return 1.0f;
         default: return 0.0f;
     }
 }
@@ -324,6 +336,7 @@ float DrumCloudUI::getParamUiValue(uint32_t param) const
         case paramGrainRelease: return fGrainReleaseMsUi;
         case paramSampleStart: return fSampleStartUi;
         case paramSampleEnd: return fSampleEndUi;
+        case paramAutoRoot: return fAutoRootUi;
         default: return 0.0f;
     }
 }
@@ -354,6 +367,7 @@ void DrumCloudUI::setParamUiValue(uint32_t param, float value)
         case paramGrainRelease: fGrainReleaseMsUi = value; break;
         case paramSampleStart: fSampleStartUi = value; break;
         case paramSampleEnd: fSampleEndUi = value; break;
+        case paramAutoRoot: fAutoRootUi = value; break;
         default: break;
     }
 }
@@ -814,6 +828,58 @@ void DrumCloudUI::onDisplay()
     drawPixelText("PITCH", 183.0f, 282.0f, 1.15f);
     drawPixelText("GRAIN ENVELOPE", 425.0f, 282.0f, 1.15f);
 
+    // Automatic pitch analysis controls and result.
+    {
+        const float bx0 = W - 258.0f;
+        const float by0 = 18.0f;
+        const float bw = 120.0f;
+        const float bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(fAutoRootUi >= 0.5f ? 0.86f : 0.30f,
+                  fAutoRootUi >= 0.5f ? 0.65f : 0.34f,
+                  fAutoRootUi >= 0.5f ? 0.24f : 0.44f, 0.95f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(fAutoRootUi >= 0.5f ? "AUTO ROOT ON" : "AUTO ROOT OFF",
+                      bx0 + 9.0f, by0 + 6.0f, 1.15f);
+    }
+
+    {
+        char pitchBuf[28];
+        if (fDetectedRootUi >= 0)
+            std::snprintf(pitchBuf, sizeof(pitchBuf), "R%d F%.0f C%.0f",
+                          fDetectedRootUi, fDetectedFineUi,
+                          fDetectedConfidenceUi * 100.0f);
+        else
+            std::snprintf(pitchBuf, sizeof(pitchBuf), "ROOT LOW CONF");
+
+        const float bx0 = W - 258.0f;
+        const float by0 = 46.0f;
+        const float bw = 120.0f;
+        const float bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.30f, 0.34f, 0.44f, 0.9f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(fDetectedRootUi >= 0 ? 0.88f : 1.0f,
+                  fDetectedRootUi >= 0 ? 0.91f : 0.55f,
+                  fDetectedRootUi >= 0 ? 0.97f : 0.30f, 0.98f);
+        drawPixelText(pitchBuf, bx0 + 7.0f, by0 + 6.0f, 1.05f);
+    }
+
     // Data Boxes
     {
         char scanBuf[24];
@@ -990,6 +1056,25 @@ void DrumCloudUI::uiIdle()
     }
     const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
 
+    const uint32_t detectedGeneration =
+        gDrumCloudDetectedPitchGeneration.load(std::memory_order_acquire);
+    if (detectedGeneration != fDetectedPitchGenerationUi)
+    {
+        fDetectedPitchGenerationUi = detectedGeneration;
+        fDetectedRootUi = gDrumCloudDetectedRoot.load(std::memory_order_relaxed);
+        fDetectedFineUi = gDrumCloudDetectedFine.load(std::memory_order_relaxed);
+        fDetectedConfidenceUi = gDrumCloudDetectedConfidence.load(std::memory_order_relaxed);
+
+        if (fAutoRootUi >= 0.5f && fDetectedRootUi >= 0 && fDetectedConfidenceUi >= 0.70f)
+        {
+            fRootNoteUi = float(fDetectedRootUi);
+            fSampleFineTuneUi = fDetectedFineUi;
+            setParameterValue(paramRootNote, fRootNoteUi);
+            setParameterValue(paramSampleFineTune, fSampleFineTuneUi);
+        }
+        repaint();
+    }
+
     bool grainChanged = false;
     const uint32_t grainCount = std::min<uint32_t>(
         gDrumCloudUiGrainCount.load(std::memory_order_acquire), kUiGrainMarkerCount);
@@ -1036,6 +1121,29 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
     if (ev.button == 1 && ev.press)
     {
+        const float autoBx0 = (float)getWidth() - 258.0f;
+        const float autoBy0 = 18.0f;
+        const float autoBw = 120.0f;
+        const float autoBh = 22.0f;
+        if (mx >= autoBx0 && mx <= autoBx0 + autoBw &&
+            my >= autoBy0 && my <= autoBy0 + autoBh)
+        {
+            fAutoRootUi = fAutoRootUi >= 0.5f ? 0.0f : 1.0f;
+            editParameter(paramAutoRoot, true);
+            setParameterValue(paramAutoRoot, fAutoRootUi);
+            editParameter(paramAutoRoot, false);
+
+            if (fAutoRootUi >= 0.5f && fDetectedRootUi >= 0 && fDetectedConfidenceUi >= 0.70f)
+            {
+                setParameterValue(paramRootNote, float(fDetectedRootUi));
+                setParameterValue(paramSampleFineTune, fDetectedFineUi);
+                fRootNoteUi = float(fDetectedRootUi);
+                fSampleFineTuneUi = fDetectedFineUi;
+            }
+            repaint();
+            return true;
+        }
+
         const float modeBx0 = (float)getWidth() - 118.0f;
         const float modeBy0 = 18.0f;
         const float modeBw  = 90.0f;
@@ -1271,6 +1379,7 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramGrainRelease) { fGrainReleaseMsUi = value; repaint(); return; }
     if (index == paramSampleStart) { fSampleStartUi = value; repaint(); return; }
     if (index == paramSampleEnd) { fSampleEndUi = value; repaint(); return; }
+    if (index == paramAutoRoot) { fAutoRootUi = value; repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }
