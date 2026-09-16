@@ -31,8 +31,9 @@ For each format and host:
 | Host | CLAP | VST3 | Notes |
 |---|---:|---:|---|
 | Bitwig Studio | Pass | Pass | Sample loading, MIDI playback, state recall, polyphony, delay, stretch and GUI validated on Ubuntu Studio. |
-| REAPER | Pending | Pending | Test both native Linux formats. |
-| Ardour 9.8 | Pending | Pending | Confirm which native formats are exposed by the host, then run the checklist. |
+| REAPER | Pass | Pass | Both formats load with the current GUI; sample loading and playback validated. |
+| Ardour 9.8 | —* | —* | Host-level pass: DrumCloud loads and operates correctly, including the current GUI and sample workflow. *The exact format selected by the host was not recorded separately. |
+| Renoise 3.4.4 | —* | —* | Host-level pass: DrumCloud is discovered and loads correctly. *The exact format selected by the host was not recorded separately. |
 
 Record the DAW version, OS version, CPU architecture and exact failing step for
 every new result. A successful build is not counted as a host pass.
