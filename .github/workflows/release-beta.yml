@@ -1,0 +1,136 @@
+name: Publish numbered beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - RELEASE_VERSION
+      - RELEASE_NOTES.md
+      - .github/workflows/release-beta.yml
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Package Linux x86-64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgl1-mesa-dev libx11-dev libxcursor-dev libxext-dev libxrandr-dev libxinerama-dev libasound2-dev libjack-jackd2-dev ffmpeg
+      - name: Test and build
+        run: ./tools/linux-regression.sh
+      - name: Create Linux package
+        run: |
+          version=$(cat RELEASE_VERSION)
+          package="Fuimadane-DrumCloud-${version}-linux-x86_64"
+          mkdir -p "dist/${package}"
+          cp -R bin/d_drumcloud.clap bin/d_drumcloud.vst3 "dist/${package}/"
+          cp LICENSE.txt README.md CROSS_PLATFORM_TESTING.md "dist/${package}/"
+          tar -C dist -cJf "dist/${package}.tar.xz" "${package}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-linux
+          path: dist/*.tar.xz
+          if-no-files-found: error
+
+  windows:
+    name: Package Windows x86-64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: win64
+          dpf_path: DPF
+          extraargs: CXX=x86_64-w64-mingw32-g++-posix
+          release: false
+          suffix: -release-build
+      - name: Create Windows package
+        run: |
+          version=$(cat RELEASE_VERSION)
+          package="Fuimadane-DrumCloud-${version}-windows-x86_64"
+          mkdir -p "dist/${package}"
+          cp -R bin/d_drumcloud.clap bin/d_drumcloud.vst3 "dist/${package}/"
+          cp LICENSE.txt README.md CROSS_PLATFORM_TESTING.md "dist/${package}/"
+          cd dist
+          zip -r -9 "${package}.zip" "${package}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-windows
+          path: dist/*.zip
+          if-no-files-found: error
+
+  macos:
+    name: Package macOS 10.15+ universal
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: macos-10.15
+          dpf_path: DPF
+          extraargs: DRUMCLOUD_BUILD_AU=true
+          release: false
+          suffix: -release-build
+      - name: Create macOS package
+        run: |
+          version=$(cat RELEASE_VERSION)
+          source_pkg=$(find . -maxdepth 1 -name '*-macOS.pkg' -print -quit)
+          test -n "${source_pkg}"
+          mkdir -p dist
+          cp "${source_pkg}" "dist/Fuimadane-DrumCloud-${version}-macOS-universal.pkg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-macos
+          path: dist/*.pkg
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub pre-release
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read release version
+        id: version
+        run: echo "tag=$(cat RELEASE_VERSION)" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Verify release files
+        run: |
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3
+          sha256sum dist/* | tee dist/SHA256SUMS.txt
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: DrumCloud v1.9.0-beta.1
+          body_path: RELEASE_NOTES.md
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.xz
+            dist/*.zip
+            dist/*.pkg
+            dist/SHA256SUMS.txt
