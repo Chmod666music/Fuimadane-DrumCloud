@@ -737,14 +737,14 @@ void DrumCloudUI::onDisplay()
         glEnd();
 
         glLineWidth(6.0f);
-        glColor4f(0.20f, 0.85f, 1.0f, 0.18f);
+        glColor4f(1.0f, 1.0f, 1.0f, 0.18f);
         glBegin(GL_LINES);
             glVertex2f(scanX, y0);
             glVertex2f(scanX, y1);
         glEnd();
 
         glLineWidth(2.0f);
-        glColor4f(0.20f, 0.85f, 1.0f, 0.95f);
+        glColor4f(0.96f, 0.97f, 1.0f, 0.98f);
         glBegin(GL_LINES);
             glVertex2f(scanX, y0);
             glVertex2f(scanX, y1);
@@ -754,7 +754,7 @@ void DrumCloudUI::onDisplay()
     if (!fLoadStatus.empty())
     {
         if (fLoadError) glColor4f(1.0f, 0.44f, 0.34f, 1.0f);
-        else glColor4f(0.62f, 0.92f, 0.79f, 1.0f);
+        else glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(fLoadStatus.c_str(), 18.0f, 95.0f, 1.1f);
     }
 
