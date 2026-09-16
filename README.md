@@ -1,8 +1,8 @@
 # Fuimadane DrumCloud
 
-**Fuimadane DrumCloud** is a granular sample instrument built with the [DISTRHO Plugin Framework](https://github.com/DISTRHO/DPF). It loads WAV, FLAC and MP3 samples, shows their waveform, and offers granular scan modes, a filter and cloud reverb.
+**Fuimadane DrumCloud** is a granular sample instrument built with the [DISTRHO Plugin Framework](https://github.com/DISTRHO/DPF). It loads WAV, FLAC and MP3 samples and turns them into a playable polyphonic cloud with pitch detection, sample regions, moving grain heads, time stretch, scan modes, filtered delay and output protection.
 
-The latest published binaries are the [Linux v1.8.1 release in the former DPF repository](https://github.com/Chmod666music/DPF/releases/tag/v1.8.1). This dedicated repository holds the imported v1.8.1 source and future development. No Windows or macOS binary, and no new beta binary, has been published here yet.
+The current public test build is [DrumCloud v1.9.0-beta.1](https://github.com/Chmod666music/Fuimadane-DrumCloud/releases/tag/v1.9.0-beta.1), with Linux CLAP/VST3, Windows CLAP/VST3 and universal macOS CLAP/VST3/AU packages. These unsigned builds are a pre-release and must be validated in real hosts before a stable release.
 
 ## Build from source
 
@@ -18,15 +18,15 @@ git -C DPF submodule update --init dgl/src/pugl-upstream
 
 The output goes to `bin/`. See [BUILD.md](BUILD.md) before installing or testing beside an existing version with the same plugin ID. Run [tools/linux-regression.sh](tools/linux-regression.sh) for the complete native Linux test suite.
 
-## Sample size in the current development branch
+## Sample size in v1.9.0-beta.1
 
-The **1.8.2 beta candidate** on this branch accepts WAV, FLAC and MP3 files containing at most **16 million frames** and **32 million decoded float samples**. A stereo file at 48 kHz can be about 5 minutes 33 seconds long; at 44.1 kHz, about 6 minutes 2 seconds. Higher channel counts may hit the decoded-sample limit sooner. These caps protect memory on Linux, Windows and macOS; file size on disk is not a reliable substitute for decoded length.
+This beta accepts WAV, FLAC and MP3 files containing at most **16 million frames** and **32 million decoded float samples**. A stereo file at 48 kHz can be about 5 minutes 33 seconds long; at 44.1 kHz, about 6 minutes 2 seconds. Higher channel counts may hit the decoded-sample limit sooner. These caps protect memory on Linux, Windows and macOS; file size on disk is not a reliable substitute for decoded length.
 
 The waveform preview is prepared in small blocks away from the UI event thread. If a new file is too long, missing, damaged or unsupported, DrumCloud displays the reason and leaves the previously selected sample and waveform in place. A saved project stores the sample **path**, so the audio file must remain at that path for recall. A supported file may still fail DSP preparation if it is changed or removed between validation and playback; the DSP retains its previous audio in that case.
 
 ## Beta development
 
-Future numbered beta builds will target Linux, Windows and macOS. Each download will identify its operating system, CPU architecture and format, and volunteers will be invited to report results by DAW. See [NEXT.md](NEXT.md) for the feature roadmap and tester matrix. Features from the separate [DrumCloud JS project](https://github.com/Chmod666music/DrumCloud-ReaPack) are candidates for the native instrument.
+Numbered beta builds target Linux, Windows and macOS. Each download identifies its operating system, CPU architecture and formats. See [CROSS_PLATFORM_TESTING.md](CROSS_PLATFORM_TESTING.md) for installation and testing guidance, and use the DrumCloud beta report issue template for results. Features from the separate [DrumCloud JS project](https://github.com/Chmod666music/DrumCloud-ReaPack) remain candidates for the native instrument.
 
 ## Credits and source history
 

@@ -1,6 +1,7 @@
 # Build DrumCloud from this repository
 
-The imported source is based on DrumCloud v1.8.1. Linux CLAP and VST3 compile from this checkout. No new beta binary has been released.
+The source was imported from DrumCloud v1.8.1 and has since developed into the
+v1.9 beta series. Linux CLAP and VST3 compile from this checkout.
 
 Clone with submodules, or after cloning run:
 
