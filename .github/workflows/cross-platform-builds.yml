@@ -1,0 +1,48 @@
+name: Windows and macOS beta builds
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x86-64:
+    name: Windows x86-64 (CLAP and VST3)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: win64
+          dpf_path: DPF
+          # Ubuntu's generic MinGW driver uses the win32 thread model, which
+          # lacks std::thread/mutex. DrumCloud's async loader needs POSIX threads.
+          extraargs: CXX=x86_64-w64-mingw32-g++-posix
+          release: false
+          suffix: -beta
+
+  macos-universal:
+    name: macOS 10.15+ universal (CLAP, VST3 and AU)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize only required DPF submodules
+        run: |
+          git submodule update --init DPF
+          git -C DPF submodule update --init dgl/src/pugl-upstream
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          # DrumCloud uses C++17 std::filesystem, which requires macOS 10.15.
+          target: macos-10.15
+          dpf_path: DPF
+          extraargs: DRUMCLOUD_BUILD_AU=true
+          release: false
+          suffix: -beta

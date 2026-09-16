@@ -8,14 +8,17 @@ assignees: []
 
 **Build tested**
 - Beta version:
-- Download/commit:
+- Artifact name:
+- Commit SHA:
 - Operating system and version:
 - CPU architecture:
 - Plugin format (CLAP, VST3, AU, LV2):
+- Native or compatibility mode (for example Rosetta):
 
 **Host**
 - DAW and version:
 - Was the plugin found, opened, and resized?
+- Did the dark-and-gold GUI render correctly after reopening it?
 - Could it load a sample and play MIDI notes?
 - Did the sample and settings return after saving and reopening the project?
 
