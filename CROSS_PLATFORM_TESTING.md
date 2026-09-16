@@ -67,8 +67,8 @@ artifact name and commit SHA. Do not share private samples or credentials.
 
 | Platform | Architecture | Formats built | Build | Host validation |
 |---|---|---|---|---|
-| Windows 10/11 | x86-64 | CLAP, VST3 | Pending CI | Pending testers |
-| macOS 10.15+ | Universal: Intel + Apple Silicon | CLAP, VST3, AU | Pending CI | Pending testers |
+| Windows 10/11 | x86-64 | CLAP, VST3 | Pass: compiled and packaged | Pending testers |
+| macOS 10.15+ | Universal: Intel + Apple Silicon | CLAP, VST3, AU | Pass: compiled and packaged | Pending testers |
 
 Signing, notarization and an end-user installer/release archive are separate
 release-engineering tasks and are not implied by this beta workflow.
