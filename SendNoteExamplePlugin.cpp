@@ -132,6 +132,9 @@ START_NAMESPACE_DISTRHO
 
 std::atomic<float> gDrumCloudUiScanPos{0.0f};
 std::atomic<int>   gDrumCloudUiScanMode{0};
+static constexpr uint32_t kUiGrainMarkerCount = 16;
+std::atomic<uint32_t> gDrumCloudUiGrainCount{0};
+std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
 
 static void dirtyDbgLog(const char* fmt, ...)
 {
@@ -442,7 +445,10 @@ static bool loadWav16(const char* path,
 class GranularEngine
 {
 public:
-    float getScanPosNorm() const { return fScanPos; } // 0..1
+    float getScanPosNorm() const
+    {
+        return fSampleStartNorm + fScanPos * (fSampleEndNorm - fSampleStartNorm);
+    } // absolute 0..1 sample position
     void init(double sampleRate)
 {
     sr = (sampleRate > 1.0) ? float(sampleRate) : 48000.0f;
@@ -781,12 +787,31 @@ void setTempoSyncPhase(float phase) noexcept
         return fSnapMs;
     }
 
+    float getSampleStartNorm() const noexcept { return fSampleStartNorm; }
+    float getSampleEndNorm() const noexcept { return fSampleEndNorm; }
 
+    void setSampleStartNorm(float value) noexcept
+    {
+        fSampleStartNorm = std::clamp(value, 0.0f, fSampleEndNorm - 0.001f);
+    }
 
+    void setSampleEndNorm(float value) noexcept
+    {
+        fSampleEndNorm = std::clamp(value, fSampleStartNorm + 0.001f, 1.0f);
+    }
 
+    uint32_t copyActiveGrainPositions(float* dst, uint32_t capacity) const noexcept
+    {
+        if (dst == nullptr || capacity == 0 || sampleLen <= 1) return 0;
+        const uint32_t count = std::min<uint32_t>(capacity, uint32_t(std::max(0, activeCount)));
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            const Grain& grain = grains[activeIdx[i]];
+            dst[i] = std::clamp(grain.pos / float(sampleLen - 1), 0.0f, 1.0f);
+        }
+        return count;
+    }
 
-
-        
 void trigger(int note, int vel)
 {
     lastNoteOn = uint8_t(note & 0x7F);
@@ -1062,7 +1087,9 @@ else
             if (sampleLen > 0)
 {
     g.pos += g.step;
-    if (g.pos < 0.0f || g.pos >= float(sampleLen - 1))
+    const float regionStart = float(getRegionStartFrame());
+    const float regionEnd = float(getRegionEndFrame());
+    if (g.pos < regionStart || g.pos >= regionEnd)
     {
         if (!g.releasing)
         {
@@ -1073,7 +1100,7 @@ else
             g.relDec = std::max(g.relDec, 1.0f / quickRelSamples);
         }
 
-        g.pos = std::clamp(g.pos, 0.0f, float(sampleLen - 1));
+        g.pos = std::clamp(g.pos, regionStart, regionEnd);
     }
 }
 else
@@ -1137,6 +1164,18 @@ static inline float rand01(uint32_t& rng)
 {
     rng = rng * 1664525u + 1013904223u;
     return float(rng >> 8) * (1.0f / 16777216.0f);
+}
+
+int32_t getRegionStartFrame() const noexcept
+{
+    if (sampleLen <= 1) return 0;
+    return std::clamp<int32_t>(int32_t(std::floor(fSampleStartNorm * float(sampleLen - 1))), 0, sampleLen - 1);
+}
+
+int32_t getRegionEndFrame() const noexcept
+{
+    if (sampleLen <= 1) return 0;
+    return std::clamp<int32_t>(int32_t(std::ceil(fSampleEndNorm * float(sampleLen - 1))), 0, sampleLen - 1);
 }
 
 inline float computeStartNorm(uint32_t& rng) const
@@ -1638,11 +1677,14 @@ void spawnOneGrain(int note, int vel, float densityMul)
 // -------------------------------
 if (sampleLen > 0)
 {
-    // base/spread in samples
-    const float startNorm = computeStartNorm(rng); // 0..1 (scan eller static)
-    const float base = startNorm * float(sampleLen - 1);
+    // Base and spread are relative to the selected sample region.
+    const int32_t regionStart = getRegionStartFrame();
+    const int32_t regionEnd = getRegionEndFrame();
+    const int32_t regionLength = std::max<int32_t>(1, regionEnd - regionStart + 1);
+    const float startNorm = computeStartNorm(rng); // 0..1 inside region
+    const float base = float(regionStart) + startNorm * float(regionLength - 1);
 
-    const float spread = fPosSpreadNorm * float(sampleLen) * 0.5f;
+    const float spread = fPosSpreadNorm * float(regionLength) * 0.5f;
 
     // rand in [-1, +1]
     const float r01 = float(rng = rng * 196314165u + 907633515u) / float(0xffffffffu);
@@ -1650,9 +1692,9 @@ if (sampleLen > 0)
 
     float pos = base + r11 * spread;
 
-    // clamp so grain fits entirely
-    const int32_t maxStart = std::max<int32_t>(0, sampleLen - g.dur - 1);
-    if (pos < 0.0f) pos = 0.0f;
+    // Clamp so the grain stays inside the selected region where possible.
+    const int32_t maxStart = std::max<int32_t>(regionStart, regionEnd - g.dur);
+    if (pos < float(regionStart)) pos = float(regionStart);
     if (pos > float(maxStart)) pos = float(maxStart);
 
     // detect "start is essentially zero"
@@ -1662,7 +1704,7 @@ if (sampleLen > 0)
 
     if (startIsZero)
     {
-        pos = 0.0f; // 🔥 force sample start
+        pos = float(regionStart); // force selected region start
     }
     else if (fSnapMs > 0.0f && markerCount > 0)
 {
@@ -1676,6 +1718,7 @@ if (sampleLen > 0)
     // tiny local zero-cross seek to reduce clicks/pops on grain start
     const int32_t zcRadius = std::max<int32_t>(1, int32_t(sr * 0.00075f)); // ~0.75 ms
     pos = float(seekZeroCrossNear(int32_t(pos), zcRadius));
+    pos = std::clamp(pos, float(regionStart), float(regionEnd));
 
     g.pos = pos;
 }
@@ -1749,8 +1792,10 @@ private:
     float fVelToGrainSize = 0.58f;
 
      // ---- position random / snap ----
-    float fStartPosNorm  = 0.0f;   // 0..1
+    float fStartPosNorm  = 0.0f;   // 0..1 within selected region
     float fPosSpreadNorm = 0.0f;   // 0..1
+    float fSampleStartNorm = 0.0f; // absolute sample region
+    float fSampleEndNorm = 1.0f;
     float fSnapMs        = 10.0f;  // ms
 
     
@@ -2036,6 +2081,12 @@ float getParameterValue(uint32_t index) const override
     if (index == paramGrainRelease)
         return fGran.getGrainReleaseMs();
 
+    if (index == paramSampleStart)
+        return fGran.getSampleStartNorm();
+
+    if (index == paramSampleEnd)
+        return fGran.getSampleEndNorm();
+
     return 0.0f;
 }
 
@@ -2143,6 +2194,14 @@ void setParameterValue(uint32_t index, float value) override
         fGran.setGrainReleaseMs(value);
         break;
 
+    case paramSampleStart:
+        fGran.setSampleStartNorm(value);
+        break;
+
+    case paramSampleEnd:
+        fGran.setSampleEndNorm(value);
+        break;
+
     default:
         break;
     }
@@ -2201,6 +2260,8 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramSampleFineTune, 0.0f);
             setParameterValue(paramGrainAttack, 10.0f);
             setParameterValue(paramGrainRelease, 80.0f);
+            setParameterValue(paramSampleStart, 0.0f);
+            setParameterValue(paramSampleEnd, 1.0f);
         }
 }
 
@@ -2398,6 +2459,18 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.ranges.max = 1000.0f;
         parameter.ranges.def = 80.0f;
         break;
+
+    case paramSampleStart:
+        parameter.name   = "Sample Start";
+        parameter.symbol = "sample_start";
+        parameter.ranges.def = 0.0f;
+        break;
+
+    case paramSampleEnd:
+        parameter.name   = "Sample End";
+        parameter.symbol = "sample_end";
+        parameter.ranges.def = 1.0f;
+        break;
     }
 }
 
@@ -2546,6 +2619,11 @@ void initParameter(uint32_t index, Parameter& parameter) override
     // Send data til UI
     gDrumCloudUiScanPos.store(fGran.getScanPosNorm(), std::memory_order_relaxed);
     gDrumCloudUiScanMode.store((int)std::lround(fGran.getScanMode()), std::memory_order_relaxed);
+    float grainPositions[kUiGrainMarkerCount]{};
+    const uint32_t grainCount = fGran.copyActiveGrainPositions(grainPositions, kUiGrainMarkerCount);
+    for (uint32_t i = 0; i < grainCount; ++i)
+        gDrumCloudUiGrainPos[i].store(grainPositions[i], std::memory_order_relaxed);
+    gDrumCloudUiGrainCount.store(grainCount, std::memory_order_release);
 
     if (fScanMeterCountdown == 0)
     {
