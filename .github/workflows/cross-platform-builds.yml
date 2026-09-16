@@ -1,0 +1,40 @@
+name: Windows and macOS beta builds
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x86-64:
+    name: Windows x86-64 (CLAP and VST3)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: win64
+          dpf_path: DPF
+          release: false
+          suffix: -beta
+
+  macos-universal:
+    name: macOS universal (CLAP, VST3 and AU)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: macos-universal
+          dpf_path: DPF
+          extraargs: DRUMCLOUD_BUILD_AU=true
+          release: false
+          suffix: -beta

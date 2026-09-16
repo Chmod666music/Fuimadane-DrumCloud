@@ -16,4 +16,7 @@ Run `./tools/linux-regression.sh` to execute the native tests, build both Linux 
 
 The outputs are in `bin/d_drumcloud.clap` and `bin/d_drumcloud.vst3`. Test the new plugin from a custom plugin path before replacing an installed version with the same plugin ID. The old `install.sh` and `package.sh` are removed because they target the former nested DPF layout and v1.8.1 release packages.
 
-Windows and macOS build instructions will be written after platform builds and host tests pass. Do not publish binaries from this import alone.
+GitHub Actions also creates unsigned Windows x86-64 CLAP/VST3 and universal
+macOS CLAP/VST3/AU beta artifacts. See `CROSS_PLATFORM_TESTING.md` for download,
+installation and host-validation instructions. A successful cross-platform
+compile is not a host test, and these artifacts are not signed public releases.
