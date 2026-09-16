@@ -91,7 +91,7 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(760, 380)
+        : UI(760, 470)
     {
         fWaveBgLoaded = loadWaveBgTexture();
         fPreviewThread = std::thread([this]{ previewLoop(); });
@@ -161,6 +161,12 @@ private:
     float fDetectedFineUi = 0.0f;
     float fDetectedConfidenceUi = 0.0f;
     uint32_t fDetectedPitchGenerationUi = 0;
+    float fDelayModeUi = 0.0f;
+    float fDelayTimeLeftUi = 375.0f;
+    float fDelayTimeRightUi = 500.0f;
+    float fDelayFeedbackUi = 0.35f;
+    float fDelayMixUi = 0.25f;
+    float fDelayDampingUi = 0.35f;
 
     // Interaction states
     bool  fDragKnob = false;
@@ -244,6 +250,12 @@ float DrumCloudUI::getParamMin(uint32_t param) const
         case paramSampleStart: return 0.0f;
         case paramSampleEnd: return 0.0f;
         case paramAutoRoot: return 0.0f;
+        case paramDelayMode: return 0.0f;
+        case paramDelayTimeLeft: return 1.0f;
+        case paramDelayTimeRight: return 1.0f;
+        case paramDelayFeedback: return 0.0f;
+        case paramDelayMix: return 0.0f;
+        case paramDelayDamping: return 0.0f;
         default: return 0.0f;
     }
 }
@@ -275,6 +287,12 @@ float DrumCloudUI::getParamMax(uint32_t param) const
         case paramSampleStart: return 1.0f;
         case paramSampleEnd: return 1.0f;
         case paramAutoRoot: return 1.0f;
+        case paramDelayMode: return 2.0f;
+        case paramDelayTimeLeft: return 2000.0f;
+        case paramDelayTimeRight: return 2000.0f;
+        case paramDelayFeedback: return 0.90f;
+        case paramDelayMix: return 1.0f;
+        case paramDelayDamping: return 1.0f;
         default: return 1.0f;
     }
 }
@@ -306,6 +324,12 @@ float DrumCloudUI::getParamDef(uint32_t param) const
         case paramSampleStart: return 0.0f;
         case paramSampleEnd: return 1.0f;
         case paramAutoRoot: return 1.0f;
+        case paramDelayMode: return 0.0f;
+        case paramDelayTimeLeft: return 375.0f;
+        case paramDelayTimeRight: return 500.0f;
+        case paramDelayFeedback: return 0.35f;
+        case paramDelayMix: return 0.25f;
+        case paramDelayDamping: return 0.35f;
         default: return 0.0f;
     }
 }
@@ -337,6 +361,12 @@ float DrumCloudUI::getParamUiValue(uint32_t param) const
         case paramSampleStart: return fSampleStartUi;
         case paramSampleEnd: return fSampleEndUi;
         case paramAutoRoot: return fAutoRootUi;
+        case paramDelayMode: return fDelayModeUi;
+        case paramDelayTimeLeft: return fDelayTimeLeftUi;
+        case paramDelayTimeRight: return fDelayTimeRightUi;
+        case paramDelayFeedback: return fDelayFeedbackUi;
+        case paramDelayMix: return fDelayMixUi;
+        case paramDelayDamping: return fDelayDampingUi;
         default: return 0.0f;
     }
 }
@@ -368,6 +398,12 @@ void DrumCloudUI::setParamUiValue(uint32_t param, float value)
         case paramSampleStart: fSampleStartUi = value; break;
         case paramSampleEnd: fSampleEndUi = value; break;
         case paramAutoRoot: fAutoRootUi = value; break;
+        case paramDelayMode: fDelayModeUi = std::round(value); break;
+        case paramDelayTimeLeft: fDelayTimeLeftUi = value; break;
+        case paramDelayTimeRight: fDelayTimeRightUi = value; break;
+        case paramDelayFeedback: fDelayFeedbackUi = value; break;
+        case paramDelayMix: fDelayMixUi = value; break;
+        case paramDelayDamping: fDelayDampingUi = value; break;
         default: break;
     }
 }
@@ -828,6 +864,33 @@ void DrumCloudUI::onDisplay()
     drawPixelText("PITCH", 183.0f, 282.0f, 1.15f);
     drawPixelText("GRAIN ENVELOPE", 425.0f, 282.0f, 1.15f);
 
+    // Filtered stereo / ping-pong delay.
+    const float r4 = 19.0f;
+    const float cy4 = 412.0f;
+    const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
+    const uint32_t params4[6] = {
+        paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
+        paramDelayFeedback, paramDelayMix, paramDelayDamping
+    };
+    const char* labels4[6] = { "MODE", "TIME L", "TIME R", "FDBK", "MIX", "DAMP" };
+
+    for (int i = 0; i < 6; ++i)
+    {
+        const float vmin = getParamMin(params4[i]);
+        const float vmax = getParamMax(params4[i]);
+        const float val = getParamUiValue(params4[i]);
+        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
+        drawModernKnob(cx4[i], cy4, r4, t, labels4[i], fHoverKnobParam == params4[i]);
+    }
+
+    const char* delayModeName = "OFF";
+    if (int(std::lround(fDelayModeUi)) == 1) delayModeName = "STEREO";
+    else if (int(std::lround(fDelayModeUi)) == 2) delayModeName = "PING PONG";
+    char delayTitle[32];
+    std::snprintf(delayTitle, sizeof(delayTitle), "DELAY %s", delayModeName);
+    glColor4f(0.72f, 0.53f, 0.22f, 0.9f);
+    drawPixelText(delayTitle, 324.0f, 371.0f, 1.15f);
+
     // Automatic pitch analysis controls and result.
     {
         const float bx0 = W - 258.0f;
@@ -1008,6 +1071,16 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
         const uint32_t p3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
         for (int i = 0; i < 4; ++i) {
             if (hitKnob(mx, my, cx3[i], cy3, 20.0f)) hoverNow = p3[i];
+        }
+
+        const float cy4 = 412.0f;
+        const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
+        const uint32_t p4[6] = {
+            paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
+            paramDelayFeedback, paramDelayMix, paramDelayDamping
+        };
+        for (int i = 0; i < 6; ++i) {
+            if (hitKnob(mx, my, cx4[i], cy4, 19.0f)) hoverNow = p4[i];
         }
     }
 
@@ -1282,6 +1355,42 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             }
         }
 
+        const float cy4 = 412.0f;
+        const float cx4[6] = { 92.0f, 207.0f, 322.0f, 437.0f, 552.0f, 667.0f };
+        const uint32_t params4[6] = {
+            paramDelayMode, paramDelayTimeLeft, paramDelayTimeRight,
+            paramDelayFeedback, paramDelayMix, paramDelayDamping
+        };
+        for (int i = 0; i < 6; ++i)
+        {
+            if (!hitKnob(mx, my, cx4[i], cy4, 19.0f)) continue;
+
+            const auto now = std::chrono::steady_clock::now();
+            const bool isDoubleClick = (fLastClickParam == params4[i]) &&
+                (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
+            fLastClickTime = now;
+            fLastClickParam = params4[i];
+
+            if (isDoubleClick)
+            {
+                const float defVal = getParamDef(params4[i]);
+                editParameter(params4[i], true);
+                setParamUiValue(params4[i], defVal);
+                setParameterValue(params4[i], defVal);
+                editParameter(params4[i], false);
+                repaint();
+            }
+            else
+            {
+                fDragKnob = true;
+                fDragKnobParam = params4[i];
+                fKnobDragStartX = mx;
+                fKnobDragStartValue = getParamUiValue(params4[i]);
+                editParameter(params4[i], true);
+            }
+            return true;
+        }
+
         if (hitWave)
         {
             fChoosingSample = true;
@@ -1380,6 +1489,12 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramSampleStart) { fSampleStartUi = value; repaint(); return; }
     if (index == paramSampleEnd) { fSampleEndUi = value; repaint(); return; }
     if (index == paramAutoRoot) { fAutoRootUi = value; repaint(); return; }
+    if (index == paramDelayMode) { fDelayModeUi = std::round(value); repaint(); return; }
+    if (index == paramDelayTimeLeft) { fDelayTimeLeftUi = value; repaint(); return; }
+    if (index == paramDelayTimeRight) { fDelayTimeRightUi = value; repaint(); return; }
+    if (index == paramDelayFeedback) { fDelayFeedbackUi = value; repaint(); return; }
+    if (index == paramDelayMix) { fDelayMixUi = value; repaint(); return; }
+    if (index == paramDelayDamping) { fDelayDampingUi = value; repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }

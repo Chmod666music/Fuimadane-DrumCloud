@@ -36,6 +36,10 @@ jobs:
         run: |
           g++ -std=gnu++17 -O2 -Wall -Wextra tests/pitch_detector.cpp PitchDetector.cpp -I. -o /tmp/drumcloud-pitch-detector-test
           /tmp/drumcloud-pitch-detector-test
+      - name: Test filtered stereo and ping-pong delay
+        run: |
+          g++ -std=gnu++17 -O2 -Wall -Wextra tests/filtered_delay.cpp FilteredStereoDelay.cpp -I. -o /tmp/drumcloud-delay-test
+          /tmp/drumcloud-delay-test
       - name: Build CLAP and VST3
         run: |
           ./build.sh

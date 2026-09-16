@@ -19,6 +19,7 @@
 #include "DistrhoPlugin.hpp"
 #include "AudioFileLoader.hpp"
 #include "PitchDetector.hpp"
+#include "FilteredStereoDelay.hpp"
 
 // 👇 SÆT FILTER-KLASSEN IND HER 👇
 struct SvfStereo {
@@ -2099,6 +2100,13 @@ float getParameterValue(uint32_t index) const override
     if (index == paramAutoRoot)
         return fAutoRoot ? 1.0f : 0.0f;
 
+    if (index == paramDelayMode) return float(fDelayMode);
+    if (index == paramDelayTimeLeft) return fDelayTimeLeftMs;
+    if (index == paramDelayTimeRight) return fDelayTimeRightMs;
+    if (index == paramDelayFeedback) return fDelayFeedback;
+    if (index == paramDelayMix) return fDelayMix;
+    if (index == paramDelayDamping) return fDelayDamping;
+
     return 0.0f;
 }
 
@@ -2218,6 +2226,30 @@ void setParameterValue(uint32_t index, float value) override
         fAutoRoot = value >= 0.5f;
         break;
 
+    case paramDelayMode:
+        fDelayMode = std::clamp(int(std::lround(value)), 0, 2);
+        break;
+
+    case paramDelayTimeLeft:
+        fDelayTimeLeftMs = std::clamp(value, 1.0f, 2000.0f);
+        break;
+
+    case paramDelayTimeRight:
+        fDelayTimeRightMs = std::clamp(value, 1.0f, 2000.0f);
+        break;
+
+    case paramDelayFeedback:
+        fDelayFeedback = std::clamp(value, 0.0f, 0.90f);
+        break;
+
+    case paramDelayMix:
+        fDelayMix = std::clamp(value, 0.0f, 1.0f);
+        break;
+
+    case paramDelayDamping:
+        fDelayDamping = std::clamp(value, 0.0f, 1.0f);
+        break;
+
     default:
         break;
     }
@@ -2279,6 +2311,12 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramSampleStart, 0.0f);
             setParameterValue(paramSampleEnd, 1.0f);
             setParameterValue(paramAutoRoot, 1.0f);
+            setParameterValue(paramDelayMode, 0.0f);
+            setParameterValue(paramDelayTimeLeft, 375.0f);
+            setParameterValue(paramDelayTimeRight, 500.0f);
+            setParameterValue(paramDelayFeedback, 0.35f);
+            setParameterValue(paramDelayMix, 0.25f);
+            setParameterValue(paramDelayDamping, 0.35f);
         }
 }
 
@@ -2495,6 +2533,53 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.hints  = kParameterIsAutomatable | kParameterIsBoolean | kParameterIsInteger;
         parameter.ranges.def = 1.0f;
         break;
+
+    case paramDelayMode:
+        parameter.name   = "Delay Mode";
+        parameter.symbol = "delay_mode";
+        parameter.hints  = kParameterIsAutomatable | kParameterIsInteger;
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 2.0f;
+        parameter.ranges.def = 0.0f;
+        break;
+
+    case paramDelayTimeLeft:
+        parameter.name   = "Delay Time Left";
+        parameter.symbol = "delay_time_l";
+        parameter.unit   = "ms";
+        parameter.ranges.min = 1.0f;
+        parameter.ranges.max = 2000.0f;
+        parameter.ranges.def = 375.0f;
+        break;
+
+    case paramDelayTimeRight:
+        parameter.name   = "Delay Time Right";
+        parameter.symbol = "delay_time_r";
+        parameter.unit   = "ms";
+        parameter.ranges.min = 1.0f;
+        parameter.ranges.max = 2000.0f;
+        parameter.ranges.def = 500.0f;
+        break;
+
+    case paramDelayFeedback:
+        parameter.name   = "Delay Feedback";
+        parameter.symbol = "delay_feedback";
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 0.90f;
+        parameter.ranges.def = 0.35f;
+        break;
+
+    case paramDelayMix:
+        parameter.name   = "Delay Mix";
+        parameter.symbol = "delay_mix";
+        parameter.ranges.def = 0.25f;
+        break;
+
+    case paramDelayDamping:
+        parameter.name   = "Delay Damping";
+        parameter.symbol = "delay_damping";
+        parameter.ranges.def = 0.35f;
+        break;
     }
 }
 
@@ -2547,6 +2632,7 @@ void initParameter(uint32_t index, Parameter& parameter) override
     {
         fGran.init(getSampleRate());
         m_reverb.init(getSampleRate()); // 👈 VIGTIGT: Starter rumklangen
+        m_delay.init(float(getSampleRate()));
         fLimiterReleaseCoeff = 1.0f - std::exp(-1.0f / (0.100f * float(std::max(1.0, getSampleRate()))));
         fLastSR = getSampleRate();
         fGranInit = true;
@@ -2651,6 +2737,15 @@ void initParameter(uint32_t index, Parameter& parameter) override
         for(uint32_t f=0; f<frames; ++f) {
             m_reverb.process(outL[f], outR[f], fReverbSize, fReverbMix);
         }
+    }
+
+    // 4. Filtered stereo / ping-pong delay.
+    m_delay.setParameters(fDelayMode, fDelayTimeLeftMs, fDelayTimeRightMs,
+                          fDelayFeedback, fDelayMix, fDelayDamping);
+    if (fDelayMode != 0)
+    {
+        for (uint32_t f = 0; f < frames; ++f)
+            m_delay.process(outL[f], outR[f]);
     }
 
     // Send data til UI
@@ -2778,6 +2873,14 @@ private:
     float fReverbSize = 0.8f;
     float fReverbMix = 0.0f;
     CloudReverb m_reverb;
+
+    int fDelayMode = 0;
+    float fDelayTimeLeftMs = 375.0f;
+    float fDelayTimeRightMs = 500.0f;
+    float fDelayFeedback = 0.35f;
+    float fDelayMix = 0.25f;
+    float fDelayDamping = 0.35f;
+    FilteredStereoDelay m_delay;
 }; // <-- Slutningen af din Plugin-klasse
 
 
