@@ -154,6 +154,7 @@ private:
     float fSampleFineTuneUi = 0.0f;
     float fGrainAttackMsUi = 10.0f;
     float fGrainReleaseMsUi = 80.0f;
+    float fTimeStretchUi = 1.0f;
     float fSampleStartUi = 0.0f;
     float fSampleEndUi = 1.0f;
     float fAutoRootUi = 1.0f;
@@ -256,6 +257,7 @@ float DrumCloudUI::getParamMin(uint32_t param) const
         case paramDelayFeedback: return 0.0f;
         case paramDelayMix: return 0.0f;
         case paramDelayDamping: return 0.0f;
+        case paramTimeStretch: return 0.25f;
         default: return 0.0f;
     }
 }
@@ -293,6 +295,7 @@ float DrumCloudUI::getParamMax(uint32_t param) const
         case paramDelayFeedback: return 0.90f;
         case paramDelayMix: return 1.0f;
         case paramDelayDamping: return 1.0f;
+        case paramTimeStretch: return 4.0f;
         default: return 1.0f;
     }
 }
@@ -330,6 +333,7 @@ float DrumCloudUI::getParamDef(uint32_t param) const
         case paramDelayFeedback: return 0.35f;
         case paramDelayMix: return 0.25f;
         case paramDelayDamping: return 0.35f;
+        case paramTimeStretch: return 1.0f;
         default: return 0.0f;
     }
 }
@@ -367,6 +371,7 @@ float DrumCloudUI::getParamUiValue(uint32_t param) const
         case paramDelayFeedback: return fDelayFeedbackUi;
         case paramDelayMix: return fDelayMixUi;
         case paramDelayDamping: return fDelayDampingUi;
+        case paramTimeStretch: return fTimeStretchUi;
         default: return 0.0f;
     }
 }
@@ -404,6 +409,7 @@ void DrumCloudUI::setParamUiValue(uint32_t param, float value)
         case paramDelayFeedback: fDelayFeedbackUi = value; break;
         case paramDelayMix: fDelayMixUi = value; break;
         case paramDelayDamping: fDelayDampingUi = value; break;
+        case paramTimeStretch: fTimeStretchUi = value; break;
         default: break;
     }
 }
@@ -847,22 +853,28 @@ void DrumCloudUI::onDisplay()
     // v1.9 tuning and per-grain envelope controls.
     const float r3 = 20.0f;
     const float cy3 = 323.0f;
-    const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
-    const uint32_t params3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
-    const char* labels3[4] = { "ROOT", "FINE", "G ATK", "G REL" };
+    const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
+    const uint32_t params3[5] = {
+        paramRootNote, paramSampleFineTune, paramGrainAttack,
+        paramGrainRelease, paramTimeStretch
+    };
+    const char* labels3[5] = { "ROOT", "FINE", "G ATK", "G REL", "STRETCH" };
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         const float vmin = getParamMin(params3[i]);
         const float vmax = getParamMax(params3[i]);
         const float val = getParamUiValue(params3[i]);
-        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
+        const float t = (params3[i] == paramTimeStretch)
+            ? std::clamp((std::log2(std::max(0.25f, val)) + 2.0f) * 0.25f, 0.0f, 1.0f)
+            : ((vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f);
         drawModernKnob(cx3[i], cy3, r3, t, labels3[i], fHoverKnobParam == params3[i]);
     }
 
     glColor4f(0.72f, 0.53f, 0.22f, 0.9f);
-    drawPixelText("PITCH", 183.0f, 282.0f, 1.15f);
-    drawPixelText("GRAIN ENVELOPE", 425.0f, 282.0f, 1.15f);
+    drawPixelText("PITCH", 124.0f, 282.0f, 1.15f);
+    drawPixelText("GRAIN ENVELOPE", 355.0f, 282.0f, 1.15f);
+    drawPixelText("TIME", 617.0f, 282.0f, 1.15f);
 
     // Filtered stereo / ping-pong delay.
     const float r4 = 19.0f;
@@ -1041,7 +1053,17 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
         const float minV = getParamMin(fDragKnobParam);
         const float maxV = getParamMax(fDragKnobParam);
         const float range = maxV - minV;
-        float newValue = fKnobDragStartValue + ((mx - fKnobDragStartX) / 260.0f) * range;
+        float newValue;
+        if (fDragKnobParam == paramTimeStretch)
+        {
+            const float startOctaves = std::log2(std::clamp(fKnobDragStartValue, 0.25f, 4.0f));
+            newValue = std::exp2(std::clamp(startOctaves + ((mx - fKnobDragStartX) / 260.0f) * 4.0f,
+                                            -2.0f, 2.0f));
+        }
+        else
+        {
+            newValue = fKnobDragStartValue + ((mx - fKnobDragStartX) / 260.0f) * range;
+        }
         newValue = std::clamp(newValue, minV, maxV);
         setParamUiValue(fDragKnobParam, newValue);
         setParameterValue(fDragKnobParam, newValue);
@@ -1067,9 +1089,12 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
         }
 
         const float cy3 = 323.0f;
-        const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
-        const uint32_t p3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
-        for (int i = 0; i < 4; ++i) {
+        const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
+        const uint32_t p3[5] = {
+            paramRootNote, paramSampleFineTune, paramGrainAttack,
+            paramGrainRelease, paramTimeStretch
+        };
+        for (int i = 0; i < 5; ++i) {
             if (hitKnob(mx, my, cx3[i], cy3, 20.0f)) hoverNow = p3[i];
         }
 
@@ -1322,9 +1347,12 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
         }
 
         const float cy3 = 323.0f;
-        const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
-        const uint32_t params3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
-        for (int i = 0; i < 4; ++i)
+        const float cx3[5] = { 130.0f, 255.0f, 380.0f, 505.0f, 630.0f };
+        const uint32_t params3[5] = {
+            paramRootNote, paramSampleFineTune, paramGrainAttack,
+            paramGrainRelease, paramTimeStretch
+        };
+        for (int i = 0; i < 5; ++i)
         {
             if (hitKnob(mx, my, cx3[i], cy3, 20.0f))
             {
@@ -1495,6 +1523,7 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramDelayFeedback) { fDelayFeedbackUi = value; repaint(); return; }
     if (index == paramDelayMix) { fDelayMixUi = value; repaint(); return; }
     if (index == paramDelayDamping) { fDelayDampingUi = value; repaint(); return; }
+    if (index == paramTimeStretch) { fTimeStretchUi = value; repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }

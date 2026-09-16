@@ -21,6 +21,7 @@
 #include "PitchDetector.hpp"
 #include "FilteredStereoDelay.hpp"
 #include "PolyphonicNoteState.hpp"
+#include "GranularTimeStretch.hpp"
 
 // 👇 SÆT FILTER-KLASSEN IND HER 👇
 struct SvfStereo {
@@ -644,6 +645,16 @@ float getGrainReleaseMs() const noexcept
     return fGrainReleaseMs;
 }
 
+float getTimeStretchRatio() const noexcept
+{
+    return fTimeStretchRatio;
+}
+
+void setTimeStretchRatio(float ratio) noexcept
+{
+    fTimeStretchRatio = DrumCloudTimeStretch::clampRatio(ratio);
+}
+
 void setGrainReleaseMs(float ms) noexcept
 {
     fGrainReleaseMs = std::clamp(ms, 0.0f, 1000.0f);
@@ -875,14 +886,18 @@ void process(float* outL, float* outR, uint32_t frames)
         }
         else if (fScanMode == kScanForward)
         {
-            fScanPos += (fScanSpeed * float(frames)) / sr;
+            const float scanRate = DrumCloudTimeStretch::scaleScanRate(fScanSpeed, fTimeStretchRatio);
+            fScanPos += (scanRate * float(frames)) / sr;
             fScanPos -= std::floor(fScanPos);
             fScanTargetPos = fScanPos;
         }
         else if (fScanMode == kScanRandomJump)
         {
             const float speedScale = std::max(0.05f, fScanSpeed);
-            const float effectiveJumpRateHz = std::max(0.10f, fScanJumpRateHz * speedScale);
+            const float effectiveJumpRateHz = std::max(
+                0.10f,
+                DrumCloudTimeStretch::scaleScanRate(fScanJumpRateHz * speedScale,
+                                                    fTimeStretchRatio));
 
             fScanHoldSamples -= float(frames);
 
@@ -902,7 +917,9 @@ void process(float* outL, float* outR, uint32_t frames)
         {
             if (fTempoSyncPlaying)
             {
-                const float beatsPerSec = (fTempoSyncBpm / 60.0f) * getTempoSyncRateMultiplier();
+                const float beatsPerSec = DrumCloudTimeStretch::scaleScanRate(
+                    (fTempoSyncBpm / 60.0f) * getTempoSyncRateMultiplier(),
+                    fTimeStretchRatio);
                 fTempoSyncPhase += (beatsPerSec * float(frames)) / sr;
                 fTempoSyncPhase -= std::floor(fTempoSyncPhase);
                 fScanPos = std::clamp(fTempoSyncPhase, 0.0f, 1.0f);
@@ -1730,6 +1747,7 @@ private:
     float fSampleFineTuneCents = 0.0f;
     float fGrainAttackMs = 10.0f;
     float fGrainReleaseMs = 80.0f;
+    float fTimeStretchRatio = 1.0f;
     PolyphonicNoteState fNotes;
 
     static constexpr int kMaxLoop = 48000 * 4;
@@ -2046,6 +2064,7 @@ float getParameterValue(uint32_t index) const override
     if (index == paramDelayFeedback) return fDelayFeedback;
     if (index == paramDelayMix) return fDelayMix;
     if (index == paramDelayDamping) return fDelayDamping;
+    if (index == paramTimeStretch) return fGran.getTimeStretchRatio();
 
     return 0.0f;
 }
@@ -2190,6 +2209,10 @@ void setParameterValue(uint32_t index, float value) override
         fDelayDamping = std::clamp(value, 0.0f, 1.0f);
         break;
 
+    case paramTimeStretch:
+        fGran.setTimeStretchRatio(value);
+        break;
+
     default:
         break;
     }
@@ -2257,6 +2280,7 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramDelayFeedback, 0.35f);
             setParameterValue(paramDelayMix, 0.25f);
             setParameterValue(paramDelayDamping, 0.35f);
+            setParameterValue(paramTimeStretch, 1.0f);
         }
 }
 
@@ -2519,6 +2543,16 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.name   = "Delay Damping";
         parameter.symbol = "delay_damping";
         parameter.ranges.def = 0.35f;
+        break;
+
+    case paramTimeStretch:
+        parameter.name   = "Time Stretch";
+        parameter.symbol = "time_stretch";
+        parameter.unit   = "x";
+        parameter.hints |= kParameterIsLogarithmic;
+        parameter.ranges.min = DrumCloudTimeStretch::kMinimumRatio;
+        parameter.ranges.max = DrumCloudTimeStretch::kMaximumRatio;
+        parameter.ranges.def = 1.0f;
         break;
     }
 }
@@ -2841,4 +2875,3 @@ Plugin* createPlugin()
 }
 
 END_NAMESPACE_DISTRHO
-
