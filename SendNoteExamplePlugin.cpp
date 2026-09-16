@@ -18,6 +18,7 @@
 #include "DistrhoPluginInfo.h"
 #include "DistrhoPlugin.hpp"
 #include "AudioFileLoader.hpp"
+#include "PitchDetector.hpp"
 
 // 👇 SÆT FILTER-KLASSEN IND HER 👇
 struct SvfStereo {
@@ -135,6 +136,10 @@ std::atomic<int>   gDrumCloudUiScanMode{0};
 static constexpr uint32_t kUiGrainMarkerCount = 16;
 std::atomic<uint32_t> gDrumCloudUiGrainCount{0};
 std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
+std::atomic<uint32_t> gDrumCloudDetectedPitchGeneration{0};
+std::atomic<int> gDrumCloudDetectedRoot{-1};
+std::atomic<float> gDrumCloudDetectedFine{0.0f};
+std::atomic<float> gDrumCloudDetectedConfidence{0.0f};
 
 static void dirtyDbgLog(const char* fmt, ...)
 {
@@ -483,6 +488,7 @@ public:
         int markerCount = 0;
         float waveMin[1024]{};
         float waveMax[1024]{};
+        PitchDetectionResult pitch;
     };
 
     static std::unique_ptr<PreparedSample> prepareSample(const std::string& path)
@@ -499,6 +505,9 @@ public:
         std::memcpy(prepared->markers, scratch->markers, sizeof(prepared->markers));
         std::memcpy(prepared->waveMin, scratch->waveMin, sizeof(prepared->waveMin));
         std::memcpy(prepared->waveMax, scratch->waveMax, sizeof(prepared->waveMax));
+        prepared->pitch = detectSamplePitch(prepared->left.data(), prepared->right.data(),
+                                            uint32_t(std::max(0, prepared->length)),
+                                            prepared->sampleRate);
         return prepared;
     }
 
@@ -2087,6 +2096,9 @@ float getParameterValue(uint32_t index) const override
     if (index == paramSampleEnd)
         return fGran.getSampleEndNorm();
 
+    if (index == paramAutoRoot)
+        return fAutoRoot ? 1.0f : 0.0f;
+
     return 0.0f;
 }
 
@@ -2202,6 +2214,10 @@ void setParameterValue(uint32_t index, float value) override
         fGran.setSampleEndNorm(value);
         break;
 
+    case paramAutoRoot:
+        fAutoRoot = value >= 0.5f;
+        break;
+
     default:
         break;
     }
@@ -2262,6 +2278,7 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramGrainRelease, 80.0f);
             setParameterValue(paramSampleStart, 0.0f);
             setParameterValue(paramSampleEnd, 1.0f);
+            setParameterValue(paramAutoRoot, 1.0f);
         }
 }
 
@@ -2471,6 +2488,13 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.symbol = "sample_end";
         parameter.ranges.def = 1.0f;
         break;
+
+    case paramAutoRoot:
+        parameter.name   = "Auto Root";
+        parameter.symbol = "auto_root";
+        parameter.hints  = kParameterIsAutomatable | kParameterIsBoolean | kParameterIsInteger;
+        parameter.ranges.def = 1.0f;
+        break;
     }
 }
 
@@ -2536,6 +2560,19 @@ void initParameter(uint32_t index, Parameter& parameter) override
                 fReady.exchange(nullptr, std::memory_order_acq_rel))
         {
             fGran.applyPreparedSample(*ready);
+
+            const bool confident = ready->pitch.valid && ready->pitch.confidence >= 0.70f;
+            gDrumCloudDetectedRoot.store(confident ? ready->pitch.midiNote : -1, std::memory_order_relaxed);
+            gDrumCloudDetectedFine.store(confident ? ready->pitch.fineTuneCents : 0.0f, std::memory_order_relaxed);
+            gDrumCloudDetectedConfidence.store(ready->pitch.confidence, std::memory_order_relaxed);
+
+            if (fAutoRoot && confident)
+            {
+                fGran.setRootNote(float(ready->pitch.midiNote));
+                fGran.setSampleFineTune(ready->pitch.fineTuneCents);
+            }
+
+            gDrumCloudDetectedPitchGeneration.fetch_add(1, std::memory_order_release);
             fRetired.store(ready, std::memory_order_release);
         }
     }
@@ -2727,6 +2764,7 @@ private:
     float fLimiterReleaseCoeff = 0.001f;
     float fVelocityAmount = 0.42f;
     float fVelocityGrainSize = 0.58f;
+    bool fAutoRoot = true;
     double fLastSR = 0.0;
     bool fTriedRestore = false;
     float fReleaseMs = 452.5f; 
