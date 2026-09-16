@@ -44,6 +44,10 @@ jobs:
         run: |
           g++ -std=gnu++17 -O2 -Wall -Wextra tests/polyphonic_notes.cpp -I. -o /tmp/drumcloud-polyphony-test
           /tmp/drumcloud-polyphony-test
+      - name: Test granular time-stretch mapping
+        run: |
+          g++ -std=gnu++17 -O2 -Wall -Wextra tests/time_stretch.cpp -I. -o /tmp/drumcloud-time-stretch-test
+          /tmp/drumcloud-time-stretch-test
       - name: Build CLAP and VST3
         run: |
           ./build.sh
