@@ -23,6 +23,9 @@ jobs:
         with:
           target: win64
           dpf_path: DPF
+          # Ubuntu's generic MinGW driver uses the win32 thread model, which
+          # lacks std::thread/mutex. DrumCloud's async loader needs POSIX threads.
+          extraargs: CXX=x86_64-w64-mingw32-g++-posix
           release: false
           suffix: -beta
 
