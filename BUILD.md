@@ -10,7 +10,9 @@ git -C DPF submodule update --init dgl/src/pugl-upstream
 ./build.sh
 ```
 
-The build script generates `ArtworkData.hpp` from the checked-in PNG if it is absent. Commit the generated header before Windows/macOS beta builds so all platforms embed the same artwork without depending on a developer machine path or a Python installation at build time. Regenerate it with `python3 tools/embed-artwork.py` whenever the PNG changes.
+The v1.9 interface is drawn directly with portable DPF/OpenGL primitives and does not require external GUI artwork at build or run time.
+
+Run `./tools/linux-regression.sh` to execute the native tests, build both Linux formats and inspect the resulting binaries for unresolved dependencies and non-portable paths.
 
 The outputs are in `bin/d_drumcloud.clap` and `bin/d_drumcloud.vst3`. Test the new plugin from a custom plugin path before replacing an installed version with the same plugin ID. The old `install.sh` and `package.sh` are removed because they target the former nested DPF layout and v1.8.1 release packages.
 

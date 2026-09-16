@@ -16,7 +16,7 @@ git -C DPF submodule update --init dgl/src/pugl-upstream
 ./build.sh
 ```
 
-The output goes to `bin/`. See [BUILD.md](BUILD.md) before installing or testing beside an existing version with the same plugin ID. The checked-in `ArtworkData.hpp` embeds the UI artwork in every format; [tools/embed-artwork.py](tools/embed-artwork.py) regenerates it from the PNG when artwork changes.
+The output goes to `bin/`. See [BUILD.md](BUILD.md) before installing or testing beside an existing version with the same plugin ID. Run [tools/linux-regression.sh](tools/linux-regression.sh) for the complete native Linux test suite.
 
 ## Sample size in the current development branch
 
