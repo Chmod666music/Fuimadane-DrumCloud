@@ -84,7 +84,7 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(760, 300)
+        : UI(760, 380)
     {
         fWaveBgLoaded = loadWaveBgTexture();
         fPreviewThread = std::thread([this]{ previewLoop(); });
@@ -141,6 +141,10 @@ private:
     float fJumpAmountUi = 0.18f;
     float fJumpSmoothMsUi = 140.0f;
     float fSyncRateUi = 1.0f;
+    float fRootNoteUi = 60.0f;
+    float fSampleFineTuneUi = 0.0f;
+    float fGrainAttackMsUi = 10.0f;
+    float fGrainReleaseMsUi = 80.0f;
 
     // Interaction states
     bool  fDragKnob = false;
@@ -215,6 +219,10 @@ float DrumCloudUI::getParamMin(uint32_t param) const
         case paramScanJumpAmount: return 0.0f;
         case paramScanJumpSmoothMs: return 0.0f;
         case paramSyncRate: return 0.0f;
+        case paramRootNote: return 0.0f;
+        case paramSampleFineTune: return -100.0f;
+        case paramGrainAttack: return 0.0f;
+        case paramGrainRelease: return 0.0f;
         default: return 0.0f;
     }
 }
@@ -239,6 +247,10 @@ float DrumCloudUI::getParamMax(uint32_t param) const
         case paramScanJumpAmount: return 1.0f;
         case paramScanJumpSmoothMs: return 500.0f;
         case paramSyncRate: return 1.0f;
+        case paramRootNote: return 127.0f;
+        case paramSampleFineTune: return 100.0f;
+        case paramGrainAttack: return 500.0f;
+        case paramGrainRelease: return 1000.0f;
         default: return 1.0f;
     }
 }
@@ -258,11 +270,15 @@ float DrumCloudUI::getParamDef(uint32_t param) const
         case paramReverbMix: return 0.0f;
         case paramVelocityToDensity: return 0.42f;
         case paramVelocityToGrainSize: return 0.58f;
-        case paramPitchRate: return 0.71f;
+        case paramPitchRate: return 1.0f;
         case paramScanJumpRate: return 27.0f;
         case paramScanJumpAmount: return 0.69f;
         case paramScanJumpSmoothMs: return 272.0f;
         case paramSyncRate: return 1.0f;
+        case paramRootNote: return 60.0f;
+        case paramSampleFineTune: return 0.0f;
+        case paramGrainAttack: return 10.0f;
+        case paramGrainRelease: return 80.0f;
         default: return 0.0f;
     }
 }
@@ -287,6 +303,10 @@ float DrumCloudUI::getParamUiValue(uint32_t param) const
         case paramScanJumpAmount: return fJumpAmountUi;
         case paramScanJumpSmoothMs: return fJumpSmoothMsUi;
         case paramSyncRate: return fSyncRateUi;
+        case paramRootNote: return fRootNoteUi;
+        case paramSampleFineTune: return fSampleFineTuneUi;
+        case paramGrainAttack: return fGrainAttackMsUi;
+        case paramGrainRelease: return fGrainReleaseMsUi;
         default: return 0.0f;
     }
 }
@@ -311,6 +331,10 @@ void DrumCloudUI::setParamUiValue(uint32_t param, float value)
         case paramScanJumpAmount: fJumpAmountUi = value; break;
         case paramScanJumpSmoothMs: fJumpSmoothMsUi = value; break;
         case paramSyncRate: fSyncRateUi = value; break;
+        case paramRootNote: fRootNoteUi = std::round(value); break;
+        case paramSampleFineTune: fSampleFineTuneUi = value; break;
+        case paramGrainAttack: fGrainAttackMsUi = value; break;
+        case paramGrainRelease: fGrainReleaseMsUi = value; break;
         default: break;
     }
 }
@@ -432,8 +456,8 @@ void DrumCloudUI::drawModernKnob(float cx, float cy, float r, float value, const
     }
     glEnd();
 
-    if (isHovered) glColor4f(0.35f, 0.95f, 1.0f, 1.0f); 
-    else glColor4f(0.15f, 0.80f, 0.95f, 1.0f); 
+    if (isHovered) glColor4f(1.00f, 0.84f, 0.34f, 1.0f);
+    else glColor4f(0.82f, 0.58f, 0.16f, 1.0f); 
 
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(cx, cy);
@@ -460,8 +484,8 @@ void DrumCloudUI::drawModernKnob(float cx, float cy, float r, float value, const
     glVertex2f(cx + std::cos(angleVal) * r, cy + std::sin(angleVal) * r);
     glEnd();
 
-    if (isHovered) glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-    else glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+    if (isHovered) glColor4f(1.0f, 0.92f, 0.62f, 1.0f);
+    else glColor4f(0.86f, 0.72f, 0.42f, 0.98f);
     drawPixelText(label, cx - (float)std::strlen(label) * 3.3f, cy + r + 10.0f, 1.20f);
 }
 
@@ -601,7 +625,7 @@ void DrumCloudUI::onDisplay()
         }
 
         glLineWidth(1.0f);
-        glColor4f(0.62f, 0.70f, 0.82f, 1.0f);
+        glColor4f(0.86f, 0.65f, 0.26f, 1.0f);
         glBegin(GL_LINES);
         for (int i = 0; i < kWavePreviewSize; ++i)
         {
@@ -719,6 +743,26 @@ void DrumCloudUI::onDisplay()
         drawModernKnob(cx2[i], cy2, r2, t, labels2[i], isHovered);
     }
 
+    // v1.9 tuning and per-grain envelope controls.
+    const float r3 = 20.0f;
+    const float cy3 = 323.0f;
+    const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
+    const uint32_t params3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
+    const char* labels3[4] = { "ROOT", "FINE", "G ATK", "G REL" };
+
+    for (int i = 0; i < 4; ++i)
+    {
+        const float vmin = getParamMin(params3[i]);
+        const float vmax = getParamMax(params3[i]);
+        const float val = getParamUiValue(params3[i]);
+        const float t = (vmax > vmin) ? std::clamp((val - vmin) / (vmax - vmin), 0.0f, 1.0f) : 0.0f;
+        drawModernKnob(cx3[i], cy3, r3, t, labels3[i], fHoverKnobParam == params3[i]);
+    }
+
+    glColor4f(0.72f, 0.53f, 0.22f, 0.9f);
+    drawPixelText("PITCH", 183.0f, 282.0f, 1.15f);
+    drawPixelText("GRAIN ENVELOPE", 425.0f, 282.0f, 1.15f);
+
     // Data Boxes
     {
         char scanBuf[24];
@@ -817,6 +861,13 @@ bool DrumCloudUI::onMotion(const MotionEvent& ev)
         const uint32_t p2[9] = { paramVelocityToDensity, paramVelocityToGrainSize, paramPitchRate, paramScanJumpRate, paramScanJumpAmount, paramScanJumpSmoothMs, paramSyncRate, paramReverbSize, paramReverbMix };
         for (int i = 0; i < 9; ++i) {
             if (hitKnob(mx, my, cx2[i], cy2, 19.0f)) hoverNow = p2[i];
+        }
+
+        const float cy3 = 323.0f;
+        const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
+        const uint32_t p3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
+        for (int i = 0; i < 4; ++i) {
+            if (hitKnob(mx, my, cx3[i], cy3, 20.0f)) hoverNow = p3[i];
         }
     }
 
@@ -979,6 +1030,40 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             }
         }
 
+        const float cy3 = 323.0f;
+        const float cx3[4] = { 190.0f, 320.0f, 450.0f, 580.0f };
+        const uint32_t params3[4] = { paramRootNote, paramSampleFineTune, paramGrainAttack, paramGrainRelease };
+        for (int i = 0; i < 4; ++i)
+        {
+            if (hitKnob(mx, my, cx3[i], cy3, 20.0f))
+            {
+                const auto now = std::chrono::steady_clock::now();
+                const bool isDoubleClick = (fLastClickParam == params3[i]) &&
+                    (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
+                fLastClickTime = now;
+                fLastClickParam = params3[i];
+
+                if (isDoubleClick)
+                {
+                    const float defVal = getParamDef(params3[i]);
+                    editParameter(params3[i], true);
+                    setParamUiValue(params3[i], defVal);
+                    setParameterValue(params3[i], defVal);
+                    editParameter(params3[i], false);
+                    repaint();
+                }
+                else
+                {
+                    fDragKnob = true;
+                    fDragKnobParam = params3[i];
+                    fKnobDragStartX = mx;
+                    fKnobDragStartValue = getParamUiValue(params3[i]);
+                    editParameter(params3[i], true);
+                }
+                return true;
+            }
+        }
+
         if (hitWave)
         {
             fChoosingSample = true;
@@ -1057,6 +1142,11 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramScanJumpRate) { fJumpRateUi = value; repaint(); return; }
     if (index == paramScanJumpAmount) { fJumpAmountUi = value; repaint(); return; }
     if (index == paramScanJumpSmoothMs) { fJumpSmoothMsUi = value; repaint(); return; }
+    if (index == paramSyncRate) { fSyncRateUi = value; repaint(); return; }
+    if (index == paramRootNote) { fRootNoteUi = std::round(value); repaint(); return; }
+    if (index == paramSampleFineTune) { fSampleFineTuneUi = value; repaint(); return; }
+    if (index == paramGrainAttack) { fGrainAttackMsUi = value; repaint(); return; }
+    if (index == paramGrainRelease) { fGrainReleaseMsUi = value; repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }

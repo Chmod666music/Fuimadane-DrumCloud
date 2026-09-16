@@ -23,5 +23,11 @@ enum DrumCloudParams
     paramReverbMix,  // 👈 Her er de nye!
     paramSamplePath,
     paramScanPos,
+
+    // v1.9 additions: append only, preserving all v1.8.x parameter IDs.
+    paramRootNote,
+    paramSampleFineTune,
+    paramGrainAttack,
+    paramGrainRelease,
     paramCount
 };
