@@ -24,10 +24,6 @@
   #include <GL/gl.h>
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#include "ArtworkData.hpp"
-
 namespace DISTRHO {
 
 struct DrumCloudKnobSpec
@@ -142,7 +138,6 @@ public:
     DrumCloudUI()
         : UI(820, 700)
     {
-        fWaveBgLoaded = loadWaveBgTexture();
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
@@ -154,7 +149,6 @@ public:
         }
         fPreviewCV.notify_one();
         if (fPreviewThread.joinable()) fPreviewThread.join();
-        freeWaveBgTexture();
     }
 
 protected:
@@ -170,11 +164,6 @@ private:
     float fWaveMin[kWavePreviewSize]{};
     float fWaveMax[kWavePreviewSize]{};
     bool  fWaveValid = false;
-
-    GLuint fWaveBgTex = 0;
-    int    fWaveBgTexW = 0;
-    int    fWaveBgTexH = 0;
-    bool   fWaveBgLoaded = false;
 
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
@@ -257,9 +246,6 @@ private:
     bool fPreviewStop = false;
     std::string fLoadStatus;
     bool fLoadError = false;
-    bool loadWaveBgTexture();
-    void freeWaveBgTexture();
-    
     float getParamMin(uint32_t param) const;
     float getParamMax(uint32_t param) const;
     float getParamDef(uint32_t param) const;
@@ -718,41 +704,6 @@ void DrumCloudUI::drawModernKnob(float cx, float cy, float r, float value, const
     drawPixelText(label, cx - (float)std::strlen(label) * 3.3f, cy + r + 10.0f, 1.20f);
 }
 
-bool DrumCloudUI::loadWaveBgTexture()
-{
-    int w = 0, h = 0, comp = 0;
-    unsigned char* pixels = stbi_load_from_memory(
-        kDrumCloudWaveBgPng, static_cast<int>(sizeof(kDrumCloudWaveBgPng)),
-        &w, &h, &comp, 4);
-    if (!pixels || w <= 0 || h <= 0) return false;
-
-    if (fWaveBgTex != 0) glDeleteTextures(1, &fWaveBgTex);
-
-    glGenTextures(1, &fWaveBgTex);
-    glBindTexture(GL_TEXTURE_2D, fWaveBgTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    stbi_image_free(pixels);
-
-    fWaveBgTexW = w;
-    fWaveBgTexH = h;
-    return true;
-}
-
-void DrumCloudUI::freeWaveBgTexture()
-{
-    if (fWaveBgTex != 0) { glDeleteTextures(1, &fWaveBgTex); fWaveBgTex = 0; }
-    fWaveBgTexW = 0;
-    fWaveBgTexH = 0;
-    fWaveBgLoaded = false;
-}
-
 void DrumCloudUI::previewLoop()
 {
     for (;;)
@@ -843,42 +794,6 @@ void DrumCloudUI::onDisplay()
         const float scanPos = std::clamp(fScanPosUI, 0.0f, 1.0f);
         const float scanX = x0 + scanPos * (x1 - x0);
         const float ampY = 0.5f * (y1 - y0);
-
-        if (fWaveBgLoaded && fWaveBgTex != 0 && fWaveBgTexW > 0 && fWaveBgTexH > 0)
-        {
-            const float waveW = x1 - x0;
-            const float waveH = y1 - y0;
-            const float imgAspect = (float)fWaveBgTexW / (float)fWaveBgTexH;
-
-            const float zoomY = 2.4f;
-            const float alpha = 0.14f;
-
-            const float drawH = waveH * zoomY;
-            const float drawW = drawH * imgAspect;
-
-            const float centerX = x0 + 0.5f * waveW;
-            const float centerY = y0 + 0.5f * waveH - 0.08f * drawH;
-
-            const float bx0 = centerX - 0.5f * drawW;
-            const float bx1 = centerX + 0.5f * drawW;
-            const float by0 = centerY - 0.5f * drawH;
-            const float by1 = centerY + 0.5f * drawH;
-
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, fWaveBgTex);
-            glColor4f(1.0f, 1.0f, 1.0f, alpha);
-            glBegin(GL_QUADS);
-                glTexCoord2f(0.0f, 1.0f); glVertex2f(bx0, by1);
-                glTexCoord2f(1.0f, 1.0f); glVertex2f(bx1, by1);
-                glTexCoord2f(1.0f, 0.0f); glVertex2f(bx1, by0);
-                glTexCoord2f(0.0f, 0.0f); glVertex2f(bx0, by0);
-            glEnd();
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glDisable(GL_TEXTURE_2D);
-        }
 
         glLineWidth(1.0f);
         glColor4f(0.86f, 0.65f, 0.26f, 1.0f);
