@@ -1,8 +1,8 @@
 # Fuimadane DrumCloud
 
-**Fuimadane DrumCloud** is a granular sample instrument built with the [DISTRHO Plugin Framework](https://github.com/DISTRHO/DPF). It loads WAV, FLAC and MP3 samples and turns them into a playable polyphonic cloud with pitch detection, sample regions, moving grain heads, time stretch, scan modes, filtered delay and output protection.
+**Fuimadane DrumCloud** is a granular sample instrument built with the [DISTRHO Plugin Framework](https://github.com/DISTRHO/DPF). It loads WAV, FLAC and MP3 samples and turns them into a playable polyphonic cloud with pitch detection, sample regions, moving grain heads, time stretch, loop/one-shot/ping-pong playback, scan modes, filtered delay and output protection.
 
-The current public test build is [DrumCloud v1.9.0-beta.1](https://github.com/Chmod666music/Fuimadane-DrumCloud/releases/tag/v1.9.0-beta.1), with Linux CLAP/VST3, Windows CLAP/VST3 and universal macOS CLAP/VST3/AU packages. These unsigned builds are a pre-release and must be validated in real hosts before a stable release.
+The current public test build is [DrumCloud v1.9.0-beta.2](https://github.com/Chmod666music/Fuimadane-DrumCloud/releases/tag/v1.9.0-beta.2), with Linux CLAP/VST3, Windows CLAP/VST3 and universal macOS CLAP/VST3/AU packages. These unsigned builds are a pre-release and must be validated in real hosts before a stable release.
 
 ## Build from source
 
@@ -18,7 +18,7 @@ git -C DPF submodule update --init dgl/src/pugl-upstream
 
 The output goes to `bin/`. See [BUILD.md](BUILD.md) before installing or testing beside an existing version with the same plugin ID. Run [tools/linux-regression.sh](tools/linux-regression.sh) for the complete native Linux test suite.
 
-## Sample size in v1.9.0-beta.1
+## Sample-size limits
 
 This beta accepts WAV, FLAC and MP3 files containing at most **16 million frames** and **32 million decoded float samples**. A stereo file at 48 kHz can be about 5 minutes 33 seconds long; at 44.1 kHz, about 6 minutes 2 seconds. Higher channel counts may hit the decoded-sample limit sooner. These caps protect memory on Linux, Windows and macOS; file size on disk is not a reliable substitute for decoded length.
 
