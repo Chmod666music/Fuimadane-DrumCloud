@@ -167,6 +167,7 @@ private:
 
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
+    int   fPlaybackModeUi = 0;
     float fGrainPosUI[kUiGrainMarkerCount]{};
     uint32_t fGrainCountUI = 0;
     
@@ -1015,6 +1016,34 @@ void DrumCloudUI::onDisplay()
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(modeBuf, bx0 + 9.0f, by0 + 6.0f, 1.35f);
     }
+
+    // Playback boundary behaviour for SCAN mode.
+    {
+        const char* playbackName = "PLAY LOOP";
+        switch (fPlaybackModeUi)
+        {
+        case 1: playbackName = "PLAY ONE SHOT"; break;
+        case 2: playbackName = "PLAY PING PONG"; break;
+        default: break;
+        }
+
+        const float bx0 = W - 258.0f;
+        const float by0 = 116.0f;
+        const float bw = 230.0f;
+        const float bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.86f, 0.65f, 0.24f, 0.95f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(playbackName, bx0 + 9.0f, by0 + 6.0f, 1.15f);
+    }
 }
 
 bool DrumCloudUI::onMotion(const MotionEvent& ev)
@@ -1218,6 +1247,32 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
+        const float playbackBx0 = (float)getWidth() - 258.0f;
+        const float playbackBy0 = 116.0f;
+        const float playbackBw = 230.0f;
+        const float playbackBh = 22.0f;
+        if (mx >= playbackBx0 && mx <= playbackBx0 + playbackBw &&
+            my >= playbackBy0 && my <= playbackBy0 + playbackBh)
+        {
+            const int newMode = (fPlaybackModeUi + 1) % 3;
+            fPlaybackModeUi = newMode;
+            editParameter(paramPlaybackMode, true);
+            setParameterValue(paramPlaybackMode, float(newMode));
+            editParameter(paramPlaybackMode, false);
+
+            // These boundary modes describe forward traversal, so selecting
+            // one from the UI also makes SCAN the active movement mode.
+            if (fScanModeUi != 1)
+            {
+                fScanModeUi = 1;
+                editParameter(paramScanMode, true);
+                setParameterValue(paramScanMode, 1.0f);
+                editParameter(paramScanMode, false);
+            }
+            repaint();
+            return true;
+        }
+
         const float modeBx0 = (float)getWidth() - 118.0f;
         const float modeBy0 = 60.0f;
         const float modeBw  = 90.0f;
@@ -1392,6 +1447,7 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramDelayMix) { fDelayMixUi = value; repaint(); return; }
     if (index == paramDelayDamping) { fDelayDampingUi = value; repaint(); return; }
     if (index == paramTimeStretch) { fTimeStretchUi = value; repaint(); return; }
+    if (index == paramPlaybackMode) { fPlaybackModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }
