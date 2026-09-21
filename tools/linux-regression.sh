@@ -70,16 +70,16 @@ for binary in "$clap_binary" "$vst3_binary"; do
         exit 1
     fi
 
-    if strings "$binary" | grep -Fq "$repo_root"; then
+    if grep -aFq "$repo_root" "$binary"; then
         echo "Local checkout path embedded in $binary" >&2
         exit 1
     fi
 
-    strings "$binary" | grep -Fq 'Fuimadane'
-    strings "$binary" | grep -Fq 'DrumCloud'
+    grep -aFq 'Fuimadane' "$binary"
+    grep -aFq 'DrumCloud' "$binary"
 done
 
-strings "$clap_binary" | grep -Fq 'dk.fuimadane.drumcloud'
+grep -aFq 'dk.fuimadane.drumcloud' "$clap_binary"
 
 echo "[4/4] Linux regression passed"
 file "$clap_binary"
