@@ -124,7 +124,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: DrumCloud v1.9.0-beta.1
+          name: DrumCloud ${{ steps.version.outputs.tag }}
           body_path: RELEASE_NOTES.md
           prerelease: true
           make_latest: false

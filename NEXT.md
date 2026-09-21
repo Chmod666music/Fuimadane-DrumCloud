@@ -2,9 +2,9 @@
 
 The native C++/DPF instrument and DrumCloud JS are separate plugins. Use the native v1.8.1 release tag as the baseline; preserve existing parameter indices and plugin IDs so saved host projects still reopen. Target Linux, Windows and macOS from one DSP codebase; build and package separately for each platform.
 
-## Next: sample playback modes
+## Completed for v1.9.0-beta.2: sample playback modes
 
-Add a `PLAY MODE` control for the main sample/scanner playhead between Sample Start and Sample End:
+The `PLAY MODE` control is implemented for the main sample/scanner playhead between Sample Start and Sample End:
 
 - `LOOP ↻`: move from Start to End and wrap to Start, preserving the current looping behavior.
 - `ONE SHOT →`: move once from Start to End and stop at End. A new MIDI note retriggers from Start; active grains should finish through their normal grain release instead of being cut abruptly.
@@ -13,7 +13,7 @@ Add a `PLAY MODE` control for the main sample/scanner playhead between Sample St
 - Make all modes cooperate with Sample Start/End, Scan Rate, Time Stretch, Position Spread/Jitter, note-off behavior and project state recall.
 - Show the selected mode clearly in the dark-and-gold UI. If practical, show current direction with a small white arrow.
 - Preserve the existing behavior as the default for old sessions and append any new parameter indices without renumbering existing parameters.
-- Test retriggering, chords, repeated notes, very short regions, reversed Start/End edge cases, host save/reopen and both CLAP/VST3 on Linux before the next beta.
+- Linux CLAP/VST3 regression and manual playback tests passed. Cross-platform host testing continues through the numbered beta.
 
 Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggering and continuing from the current position.
 

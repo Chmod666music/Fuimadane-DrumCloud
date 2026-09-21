@@ -39,5 +39,6 @@ enum DrumCloudParams
     paramDelayMix,
     paramDelayDamping,
     paramTimeStretch,
+    paramPlaybackMode,
     paramCount
 };

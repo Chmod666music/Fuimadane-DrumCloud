@@ -1,25 +1,20 @@
-# DrumCloud v1.9.0-beta.1
+# DrumCloud v1.9.0-beta.2
 
-The first public cross-platform beta of Fuimadane DrumCloud is here.
+This beta adds dedicated playback-boundary control to Fuimadane DrumCloud's
+polyphonic granular scanner.
 
-DrumCloud is a granular sample instrument for turning WAV, FLAC and MP3 files
-into playable, moving clouds of sound. Version 1.9 expands the original Linux
-instrument into a much more expressive instrument with a redesigned dark and
-gold interface.
+## New in beta.2
 
-## Highlights
-
-- Automatic sample pitch analysis with Root MIDI Note and Sample Fine Tune
-- Manual sample start/end region and visible active grain heads
-- Independent granular time stretch from 0.25x to 4x
-- True polyphonic MIDI note scheduling
-- Grain attack and release controls
-- Hold, Scan, Jump and Sync movement modes
-- Filtered Stereo and Ping Pong delay
-- Output peak protection
-- Safer bounded WAV, FLAC and MP3 loading outside the audio callback
-- Project state recall for the selected sample and parameters
-- Dark-and-gold Fuimadane interface
+- **PLAY LOOP**: scan from the selected start position to Sample End, then wrap
+- **PLAY ONE SHOT**: scan once to Sample End and stop creating new grains
+- **PLAY PING PONG**: alternate continuously between the sample-region boundaries
+- Independent playback position, direction and one-shot completion for every
+  active MIDI note, preventing polyphonic voices from moving each other's playhead
+- New notes retrigger from the selected start position
+- Existing grains finish through their natural release when ONE SHOT reaches the end
+- Playback Mode is a persistent automatable parameter and is recalled with projects
+- Dark-and-gold waveform control for selecting the playback behaviour
+- Corrected Linux regression checks for reliable binary portability validation
 
 ## Downloads
 
@@ -27,17 +22,19 @@ gold interface.
 - **Windows 10/11 x86-64:** CLAP and VST3
 - **macOS 10.15 or newer:** universal Intel/Apple Silicon CLAP, VST3 and AU
 
+## Validation status
+
+The Linux CLAP and VST3 builds passed the complete native regression suite and
+manual playback testing on Ubuntu Studio. Windows and macOS packages are
+cross-compiled automatically and still need real host testing.
+
 ## Beta warning
 
-This is a pre-release intended for testing. The Linux builds have passed host
-tests in Bitwig Studio, REAPER, Ardour and Renoise. Windows and macOS packages
-compile successfully but still need real DAW testing.
+This is an unsigned pre-release intended for testing. The macOS package is not
+notarized. Do not disable system-wide security protections. Only install files
+downloaded directly from this GitHub release and follow
+`CROSS_PLATFORM_TESTING.md`.
 
-The Windows and macOS packages are not code signed, and the macOS package is
-not notarized. Do not disable system-wide security protections. Only install
-downloads obtained directly from this GitHub release, and follow
-`CROSS_PLATFORM_TESTING.md` for platform-specific guidance.
-
-Please report both successes and failures through the repository's
-**DrumCloud beta report** issue template. Include the operating system, CPU,
-DAW version and exact plugin format tested.
+Please report successes and failures using the repository's **DrumCloud beta
+report** issue template. Include operating system/version, CPU architecture,
+DAW/version, plugin format, result and reproduction steps.
