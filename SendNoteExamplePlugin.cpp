@@ -678,9 +678,27 @@ float getScanMode() const noexcept
 void setScanMode(float v)
 {
     const int mode = int(std::lround(v));
-    fScanMode = std::clamp(mode, 0, 3);
+    const int newMode = std::clamp(mode, 0, 3);
+    if (newMode != fScanMode && newMode == kScanForward)
+        resetActiveVoicePlayback();
+    fScanMode = newMode;
     fScanHoldSamples = 0.0f;
     fScanTargetPos = fScanPos;
+}
+
+float getPlaybackMode() const noexcept
+{
+    return float(fPlaybackMode);
+}
+
+void setPlaybackMode(float v)
+{
+    const int mode = std::clamp(int(std::lround(v)), 0, 2);
+    if (mode != fPlaybackMode)
+    {
+        fPlaybackMode = mode;
+        resetActiveVoicePlayback();
+    }
 }
 
 float getScanJumpRateHz() const noexcept
@@ -829,6 +847,7 @@ void trigger(int note, int vel)
     const uint8_t midiNote = uint8_t(note & 0x7F);
     const uint8_t velocity = uint8_t(vel & 0x7F);
     fNotes.noteOn(midiNote, velocity);
+    resetVoicePlayback(midiNote);
 
     // Each note receives its own burst and then its own continuous grain stream.
     const float burstWindowSec = 0.030f;
@@ -886,9 +905,9 @@ void process(float* outL, float* outR, uint32_t frames)
         }
         else if (fScanMode == kScanForward)
         {
-            const float scanRate = DrumCloudTimeStretch::scaleScanRate(fScanSpeed, fTimeStretchRatio);
-            fScanPos += (scanRate * float(frames)) / sr;
-            fScanPos -= std::floor(fScanPos);
+            // Forward movement is advanced per MIDI voice below.  Keeping it
+            // per voice prevents a newly triggered note from moving another
+            // note's playhead.
             fScanTargetPos = fScanPos;
         }
         else if (fScanMode == kScanRandomJump)
@@ -962,10 +981,21 @@ void process(float* outL, float* outR, uint32_t frames)
 
             const uint8_t velocity = fNotes.velocity(midiNote);
             const float voiceGain = fNotes.tailGain(midiNote, totalRelease);
-            const float gps = grainsPerSecondForVelocity(velocity) * voiceGain;
-            const int spawnCount = fNotes.advanceSpawn(midiNote, gps / sr);
-            for (int spawn = 0; spawn < spawnCount; ++spawn)
-                spawnOneGrain(midiNote, velocity, voiceGain);
+            advanceVoicePlayback(midiNote);
+
+            // ONE SHOT stops creating grains at the end marker. Existing
+            // grains keep their natural envelopes, so the ending stays clean.
+            const bool maySpawn = !(fScanEnabled &&
+                                    fScanMode == kScanForward &&
+                                    fPlaybackMode == kPlaybackOneShot &&
+                                    fVoicePlaybackFinished[midiNote]);
+            if (maySpawn)
+            {
+                const float gps = grainsPerSecondForVelocity(velocity) * voiceGain;
+                const int spawnCount = fNotes.advanceSpawn(midiNote, gps / sr);
+                for (int spawn = 0; spawn < spawnCount; ++spawn)
+                    spawnOneGrain(midiNote, velocity, voiceGain);
+            }
 
             fNotes.advanceRelease(midiNote);
         }
@@ -1148,9 +1178,15 @@ int32_t getRegionEndFrame() const noexcept
     return std::clamp<int32_t>(int32_t(std::ceil(fSampleEndNorm * float(sampleLen - 1))), 0, sampleLen - 1);
 }
 
-inline float computeStartNorm(uint32_t& rng) const
+inline float computeStartNorm(int note, uint32_t& rng) const
 {
-    const float base = fScanEnabled ? fScanPos : fStartPosNorm;
+    float base = fStartPosNorm;
+    if (fScanEnabled)
+    {
+        base = (fScanMode == kScanForward && note >= 0 && note < 128)
+             ? fVoicePlaybackPos[uint8_t(note)]
+             : fScanPos;
+    }
 
     const float spread = fPosSpreadNorm;  // 0..1
 
@@ -1651,7 +1687,7 @@ if (sampleLen > 0)
     const int32_t regionStart = getRegionStartFrame();
     const int32_t regionEnd = getRegionEndFrame();
     const int32_t regionLength = std::max<int32_t>(1, regionEnd - regionStart + 1);
-    const float startNorm = computeStartNorm(rng); // 0..1 inside region
+    const float startNorm = computeStartNorm(note, rng); // 0..1 inside region
     const float base = float(regionStart) + startNorm * float(regionLength - 1);
 
     const float spread = fPosSpreadNorm * float(regionLength) * 0.5f;
@@ -1729,6 +1765,76 @@ else
         activeIdx[activeCount++] = idx;
 }
 private:
+    void resetVoicePlayback(uint8_t note) noexcept
+    {
+        fVoicePlaybackPos[note] = std::clamp(fStartPosNorm, 0.0f, 1.0f);
+        fVoicePlaybackDirection[note] = 1;
+        fVoicePlaybackFinished[note] = false;
+        fUiVoiceNote = note;
+        fScanPos = fVoicePlaybackPos[note];
+        fScanTargetPos = fScanPos;
+    }
+
+    void resetActiveVoicePlayback() noexcept
+    {
+        for (uint32_t note = 0; note < 128; ++note)
+        {
+            if (fNotes.isActive(uint8_t(note)))
+                resetVoicePlayback(uint8_t(note));
+        }
+    }
+
+    void advanceVoicePlayback(uint8_t note) noexcept
+    {
+        if (!fScanEnabled || fScanMode != kScanForward || sr <= 1.0f)
+            return;
+        if (fPlaybackMode == kPlaybackOneShot && fVoicePlaybackFinished[note])
+            return;
+
+        const float scanRate = DrumCloudTimeStretch::scaleScanRate(fScanSpeed, fTimeStretchRatio);
+        float pos = fVoicePlaybackPos[note];
+        const float step = scanRate / sr;
+
+        if (fPlaybackMode == kPlaybackPingPong)
+        {
+            pos += step * float(fVoicePlaybackDirection[note]);
+            if (pos >= 1.0f)
+            {
+                pos = 2.0f - pos;
+                fVoicePlaybackDirection[note] = -1;
+            }
+            else if (pos <= 0.0f)
+            {
+                pos = -pos;
+                fVoicePlaybackDirection[note] = 1;
+            }
+            pos = std::clamp(pos, 0.0f, 1.0f);
+        }
+        else
+        {
+            pos += step;
+            if (fPlaybackMode == kPlaybackOneShot)
+            {
+                if (pos >= 1.0f)
+                {
+                    pos = 1.0f;
+                    fVoicePlaybackFinished[note] = true;
+                }
+            }
+            else
+            {
+                pos -= std::floor(pos);
+            }
+        }
+
+        fVoicePlaybackPos[note] = pos;
+        if (note == fUiVoiceNote)
+        {
+            fScanPos = pos;
+            fScanTargetPos = pos;
+        }
+    }
+
     // ---- member variables ----
     static constexpr int kMaxGrains = 64;
     static constexpr int kWinSize   = 1024;
@@ -1741,6 +1847,13 @@ private:
         kScanTempoSync = 3
     };
 
+    enum PlaybackMode
+    {
+        kPlaybackLoop = 0,
+        kPlaybackOneShot = 1,
+        kPlaybackPingPong = 2
+    };
+
     float sr = 48000.0f;
     float fPitchRateParam = 1.0f;
     float fRootNote = 60.0f;
@@ -1749,6 +1862,11 @@ private:
     float fGrainReleaseMs = 80.0f;
     float fTimeStretchRatio = 1.0f;
     PolyphonicNoteState fNotes;
+    float fVoicePlaybackPos[128]{};
+    int8_t fVoicePlaybackDirection[128]{};
+    bool fVoicePlaybackFinished[128]{};
+    uint8_t fUiVoiceNote = 0;
+    int fPlaybackMode = kPlaybackLoop;
 
     static constexpr int kMaxLoop = 48000 * 4;
     float loopL[kMaxLoop]{};
@@ -2065,6 +2183,7 @@ float getParameterValue(uint32_t index) const override
     if (index == paramDelayMix) return fDelayMix;
     if (index == paramDelayDamping) return fDelayDamping;
     if (index == paramTimeStretch) return fGran.getTimeStretchRatio();
+    if (index == paramPlaybackMode) return fGran.getPlaybackMode();
 
     return 0.0f;
 }
@@ -2213,6 +2332,10 @@ void setParameterValue(uint32_t index, float value) override
         fGran.setTimeStretchRatio(value);
         break;
 
+    case paramPlaybackMode:
+        fGran.setPlaybackMode(value);
+        break;
+
     default:
         break;
     }
@@ -2281,6 +2404,7 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramDelayMix, 0.25f);
             setParameterValue(paramDelayDamping, 0.35f);
             setParameterValue(paramTimeStretch, 1.0f);
+            setParameterValue(paramPlaybackMode, 0.0f);
         }
 }
 
@@ -2553,6 +2677,15 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.ranges.min = DrumCloudTimeStretch::kMinimumRatio;
         parameter.ranges.max = DrumCloudTimeStretch::kMaximumRatio;
         parameter.ranges.def = 1.0f;
+        break;
+
+    case paramPlaybackMode:
+        parameter.name   = "Playback Mode";
+        parameter.symbol = "playback_mode";
+        parameter.hints  = kParameterIsAutomatable | kParameterIsInteger;
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 2.0f;
+        parameter.ranges.def = 0.0f;
         break;
     }
 }
