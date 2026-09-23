@@ -30,6 +30,16 @@ int main()
     }
     assert(previousEnd == 902);
 
+    const int32_t transients[] = { 0, 120, 275, 510, 880 };
+    assert(transientSliceCount(100, 899, transients, 5, 8) == 5);
+    assert(transientFrameRange(100, 899, transients, 5, 0, 8, start, end));
+    assert(start == 100 && end == 119);
+    assert(transientFrameRange(100, 899, transients, 5, 3, 8, start, end));
+    assert(start == 510 && end == 879);
+    assert(transientFrameRange(100, 899, transients, 5, 4, 8, start, end));
+    assert(start == 880 && end == 899);
+    assert(!transientFrameRange(100, 899, transients, 5, 5, 8, start, end));
+
     std::puts("slicer MIDI mapping and frame boundaries passed");
     return 0;
 }
