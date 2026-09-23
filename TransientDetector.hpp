@@ -7,7 +7,8 @@
 namespace DrumCloudTransients {
 
 inline int detect(const float* left, const float* right, int32_t frames,
-                  float sampleRate, int32_t* markers, int capacity) noexcept
+                  float sampleRate, int32_t* markers, int capacity,
+                  float* strengths = nullptr) noexcept
 {
     if (left == nullptr || markers == nullptr || frames <= 0 || capacity <= 0)
         return 0;
@@ -21,6 +22,7 @@ inline int detect(const float* left, const float* right, int32_t frames,
 
     int count = 1;
     markers[0] = 0;
+    if (strengths != nullptr) strengths[0] = 1.0f;
     if (peak < 1.0e-6f || capacity == 1)
         return count;
 
@@ -40,13 +42,16 @@ inline int detect(const float* left, const float* right, int32_t frames,
         const float novelty = std::max(0.0f, fastEnvelope - slowEnvelope);
         averageNovelty += 0.001f * (novelty - averageNovelty);
 
-        const float adaptiveThreshold = averageNovelty * 5.5f;
-        const float absoluteThreshold = peak * 0.004f;
-        const bool prominent = fastEnvelope >= peak * 0.025f;
+        const float adaptiveThreshold = averageNovelty * 2.0f;
+        const float absoluteThreshold = peak * 0.00035f;
+        const bool prominent = fastEnvelope >= peak * 0.004f;
         if (prominent && novelty > std::max(adaptiveThreshold, absoluteThreshold) &&
             i - lastMarker >= minimumDistance)
         {
-            markers[count++] = i;
+            markers[count] = i;
+            if (strengths != nullptr)
+                strengths[count] = std::clamp(novelty / peak, 0.0f, 1.0f);
+            ++count;
             lastMarker = i;
 
             // Suppress the same hit's immediate ringing without hiding the next beat.
