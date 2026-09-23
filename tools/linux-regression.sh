@@ -41,6 +41,14 @@ g++ -std=gnu++17 -O2 -Wall -Wextra tests/time_stretch.cpp -I. \
     -o "$reg_tmp/time-stretch-test"
 "$reg_tmp/time-stretch-test"
 
+g++ -std=gnu++17 -O2 -Wall -Wextra tests/slice_mapping.cpp -I. \
+    -o "$reg_tmp/slice-mapping-test"
+"$reg_tmp/slice-mapping-test"
+
+g++ -std=gnu++17 -O2 -Wall -Wextra tests/transient_detector.cpp -I. \
+    -o "$reg_tmp/transient-detector-test"
+"$reg_tmp/transient-detector-test"
+
 echo "[2/4] Building Linux CLAP and VST3"
 ./build.sh
 

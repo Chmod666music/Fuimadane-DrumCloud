@@ -26,6 +26,11 @@
 
 namespace DISTRHO {
 
+static constexpr float kDrumCloudUiWidth = 820.0f;
+static constexpr float kDrumCloudUiHeight = 740.0f;
+static constexpr uint kDrumCloudUiMinWidth = 615;
+static constexpr uint kDrumCloudUiMinHeight = 555;
+
 struct DrumCloudKnobSpec
 {
     uint32_t param;
@@ -37,42 +42,42 @@ struct DrumCloudKnobSpec
 
 static constexpr DrumCloudKnobSpec kDrumCloudKnobs[] = {
     // Voice / grain
-    { paramVolume, 70.0f, 248.0f, 19.0f, "VOL" },
-    { paramDensity, 162.0f, 248.0f, 19.0f, "DENS" },
-    { paramRelease, 254.0f, 248.0f, 19.0f, "REL" },
-    { paramVelocityToDensity, 346.0f, 248.0f, 19.0f, "V DENS" },
-    { paramVelocityToGrainSize, 70.0f, 326.0f, 19.0f, "V GSIZ" },
-    { paramPitchRate, 162.0f, 326.0f, 19.0f, "PITCH" },
-    { paramGrainAttack, 254.0f, 326.0f, 19.0f, "G ATK" },
-    { paramGrainRelease, 346.0f, 326.0f, 19.0f, "G REL" },
+    { paramVolume, 70.0f, 282.0f, 19.0f, "VOL" },
+    { paramDensity, 162.0f, 282.0f, 19.0f, "DENS" },
+    { paramRelease, 254.0f, 282.0f, 19.0f, "REL" },
+    { paramVelocityToDensity, 346.0f, 282.0f, 19.0f, "V DENS" },
+    { paramVelocityToGrainSize, 70.0f, 360.0f, 19.0f, "V GSIZ" },
+    { paramPitchRate, 162.0f, 360.0f, 19.0f, "PITCH" },
+    { paramGrainAttack, 254.0f, 360.0f, 19.0f, "G ATK" },
+    { paramGrainRelease, 346.0f, 360.0f, 19.0f, "G REL" },
 
     // Position / motion
-    { paramStartPosition, 470.0f, 248.0f, 19.0f, "START" },
-    { paramPositionSpread, 562.0f, 248.0f, 19.0f, "SPREAD" },
-    { paramScanSpeed, 654.0f, 248.0f, 19.0f, "SCAN" },
-    { paramSyncRate, 746.0f, 248.0f, 19.0f, "SYNC" },
-    { paramScanJumpRate, 470.0f, 326.0f, 19.0f, "J RATE" },
-    { paramScanJumpAmount, 562.0f, 326.0f, 19.0f, "J AMNT" },
-    { paramScanJumpSmoothMs, 654.0f, 326.0f, 19.0f, "J SMTH" },
-    { paramTimeStretch, 746.0f, 326.0f, 19.0f, "STRETCH" },
+    { paramStartPosition, 470.0f, 282.0f, 19.0f, "START" },
+    { paramPositionSpread, 562.0f, 282.0f, 19.0f, "SPREAD" },
+    { paramScanSpeed, 654.0f, 282.0f, 19.0f, "SCAN" },
+    { paramSyncRate, 746.0f, 282.0f, 19.0f, "SYNC" },
+    { paramScanJumpRate, 470.0f, 360.0f, 19.0f, "J RATE" },
+    { paramScanJumpAmount, 562.0f, 360.0f, 19.0f, "J AMNT" },
+    { paramScanJumpSmoothMs, 654.0f, 360.0f, 19.0f, "J SMTH" },
+    { paramTimeStretch, 746.0f, 360.0f, 19.0f, "STRETCH" },
 
     // Tone / pitch
-    { paramFilter, 72.0f, 454.0f, 20.0f, "FILTER" },
-    { paramResonance, 166.0f, 454.0f, 20.0f, "RESO" },
-    { paramRootNote, 260.0f, 454.0f, 20.0f, "ROOT" },
-    { paramSampleFineTune, 354.0f, 454.0f, 20.0f, "FINE" },
+    { paramFilter, 72.0f, 488.0f, 20.0f, "FILTER" },
+    { paramResonance, 166.0f, 488.0f, 20.0f, "RESO" },
+    { paramRootNote, 260.0f, 488.0f, 20.0f, "ROOT" },
+    { paramSampleFineTune, 354.0f, 488.0f, 20.0f, "FINE" },
 
     // Reverb
-    { paramReverbSize, 548.0f, 454.0f, 22.0f, "SIZE" },
-    { paramReverbMix, 680.0f, 454.0f, 22.0f, "MIX" },
+    { paramReverbSize, 548.0f, 488.0f, 22.0f, "SIZE" },
+    { paramReverbMix, 680.0f, 488.0f, 22.0f, "MIX" },
 
     // Delay
-    { paramDelayMode, 80.0f, 594.0f, 20.0f, "MODE" },
-    { paramDelayTimeLeft, 212.0f, 594.0f, 20.0f, "TIME L" },
-    { paramDelayTimeRight, 344.0f, 594.0f, 20.0f, "TIME R" },
-    { paramDelayFeedback, 476.0f, 594.0f, 20.0f, "FDBK" },
-    { paramDelayMix, 608.0f, 594.0f, 20.0f, "MIX" },
-    { paramDelayDamping, 740.0f, 594.0f, 20.0f, "DAMP" }
+    { paramDelayMode, 80.0f, 628.0f, 20.0f, "MODE" },
+    { paramDelayTimeLeft, 212.0f, 628.0f, 20.0f, "TIME L" },
+    { paramDelayTimeRight, 344.0f, 628.0f, 20.0f, "TIME R" },
+    { paramDelayFeedback, 476.0f, 628.0f, 20.0f, "FDBK" },
+    { paramDelayMix, 608.0f, 628.0f, 20.0f, "MIX" },
+    { paramDelayDamping, 740.0f, 628.0f, 20.0f, "DAMP" }
 };
 
 extern std::atomic<float> gDrumCloudUiScanPos;
@@ -80,6 +85,10 @@ extern std::atomic<int>   gDrumCloudUiScanMode;
 static constexpr uint32_t kUiGrainMarkerCount = 16;
 extern std::atomic<uint32_t> gDrumCloudUiGrainCount;
 extern std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
+extern std::atomic<int> gDrumCloudUiActiveSlice;
+static constexpr uint32_t kUiSliceBoundaryCount = 17;
+extern std::atomic<uint32_t> gDrumCloudUiSliceBoundaryCount;
+extern std::atomic<float> gDrumCloudUiSliceBoundaries[kUiSliceBoundaryCount];
 extern std::atomic<uint32_t> gDrumCloudDetectedPitchGeneration;
 extern std::atomic<int> gDrumCloudDetectedRoot;
 extern std::atomic<float> gDrumCloudDetectedFine;
@@ -136,8 +145,13 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(820, 700)
+        : UI(820, 740)
     {
+        // Keep the interface aspect ratio fixed, but allow manual resizing down to 75%.
+        // Rendering and pointer input are scaled explicitly below because this UI
+        // uses raw OpenGL coordinates.
+        setGeometryConstraints(kDrumCloudUiMinWidth, kDrumCloudUiMinHeight,
+                               true, false, false);
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
@@ -168,6 +182,12 @@ private:
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
     int   fPlaybackModeUi = 0;
+    int   fSliceModeUi = 0;
+    int   fSliceCountUi = 8;
+    float fSliceSensitivityUi = 0.5f;
+    int   fActiveSliceUi = -1;
+    uint32_t fSliceBoundaryCountUi = 0;
+    float fSliceBoundariesUi[kUiSliceBoundaryCount]{};
     float fGrainPosUI[kUiGrainMarkerCount]{};
     uint32_t fGrainCountUI = 0;
     
@@ -743,9 +763,21 @@ void DrumCloudUI::previewLoop()
 
 void DrumCloudUI::onDisplay()
 {
-    const float W = (float)getWidth();
-    const float waveTop = 52.0f;
-    const float waveBottom = 176.0f;
+    const float physicalWidth = std::max(1.0f, static_cast<float>(getWidth()));
+    const float physicalHeight = std::max(1.0f, static_cast<float>(getHeight()));
+    const float scaleX = physicalWidth / kDrumCloudUiWidth;
+    const float scaleY = physicalHeight / kDrumCloudUiHeight;
+    const float W = kDrumCloudUiWidth;
+
+    // Draw the complete interface in its original 820x700 coordinate system.
+    // The host window may be any proportional size; OpenGL scales every visual
+    // element, including knobs, text, waveform and hit-area markers together.
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    glScalef(scaleX, scaleY, 1.0f);
+    const float waveTop = 88.0f;
+    const float waveBottom = 210.0f;
     const float mid = 0.5f * (waveTop + waveBottom);
 
     glDisable(GL_TEXTURE_2D);
@@ -773,11 +805,11 @@ void DrumCloudUI::onDisplay()
         glVertex2f(W - 18.0f, waveBottom); glVertex2f(18.0f, waveBottom);
     glEnd();
 
-    drawPanel(18.0f, 192.0f, 384.0f, 188.0f, "VOICE / GRAIN");
-    drawPanel(418.0f, 192.0f, 384.0f, 188.0f, "POSITION / MOTION");
-    drawPanel(18.0f, 396.0f, 384.0f, 124.0f, "TONE / PITCH");
-    drawPanel(418.0f, 396.0f, 384.0f, 124.0f, "REVERB");
-    drawPanel(18.0f, 536.0f, 784.0f, 146.0f, "FILTERED DELAY");
+    drawPanel(18.0f, 226.0f, 384.0f, 188.0f, "VOICE / GRAIN");
+    drawPanel(418.0f, 226.0f, 384.0f, 188.0f, "POSITION / MOTION");
+    drawPanel(18.0f, 430.0f, 384.0f, 124.0f, "TONE / PITCH");
+    drawPanel(418.0f, 430.0f, 384.0f, 124.0f, "REVERB");
+    drawPanel(18.0f, 570.0f, 784.0f, 146.0f, "FILTERED DELAY");
 
     glLineWidth(1.0f);
     glColor4f(0.25f, 0.25f, 0.28f, 1.0f);
@@ -811,6 +843,32 @@ void DrumCloudUI::onDisplay()
         const float regionStartX = x0 + std::clamp(fSampleStartUi, 0.0f, 1.0f) * (x1 - x0);
         const float regionEndX = x0 + std::clamp(fSampleEndUi, 0.0f, 1.0f) * (x1 - x0);
 
+        if (fSliceModeUi != 0 && fSliceBoundaryCountUi >= 2)
+        {
+            const int actualSlices = int(fSliceBoundaryCountUi) - 1;
+            if (fActiveSliceUi >= 0 && fActiveSliceUi < actualSlices)
+            {
+                const float activeX0 = x0 + fSliceBoundariesUi[fActiveSliceUi] * (x1 - x0);
+                const float activeX1 = x0 + fSliceBoundariesUi[fActiveSliceUi + 1] * (x1 - x0);
+                glColor4f(0.95f, 0.62f, 0.16f, 0.12f);
+                glBegin(GL_QUADS);
+                    glVertex2f(activeX0, y0); glVertex2f(activeX1, y0);
+                    glVertex2f(activeX1, y1); glVertex2f(activeX0, y1);
+                glEnd();
+            }
+
+            glLineWidth(1.0f);
+            glColor4f(0.72f, 0.58f, 0.31f, 0.58f);
+            glBegin(GL_LINES);
+            for (uint32_t boundary = 1; boundary + 1 < fSliceBoundaryCountUi; ++boundary)
+            {
+                const float boundaryX = x0 + fSliceBoundariesUi[boundary] * (x1 - x0);
+                glVertex2f(boundaryX, y0 + 3.0f);
+                glVertex2f(boundaryX, y1 - 3.0f);
+            }
+            glEnd();
+        }
+
         // Dim audio outside the playable region and draw draggable gold handles.
         glColor4f(0.015f, 0.012f, 0.010f, 0.72f);
         glBegin(GL_QUADS);
@@ -825,6 +883,34 @@ void DrumCloudUI::onDisplay()
         glBegin(GL_LINES);
             glVertex2f(regionStartX, y0); glVertex2f(regionStartX, y1);
             glVertex2f(regionEndX, y0); glVertex2f(regionEndX, y1);
+        glEnd();
+
+        // Compact grab handles make the region edges easy to catch without
+        // covering meaningful waveform detail. They remain attached to the
+        // marker lines at every UI scale.
+        constexpr float handleHalfWidth = 7.0f;
+        constexpr float handleHeight = 11.0f;
+        glColor4f(0.96f, 0.68f, 0.18f, 1.0f);
+        glBegin(GL_QUADS);
+            glVertex2f(regionStartX - handleHalfWidth, y0);
+            glVertex2f(regionStartX + handleHalfWidth, y0);
+            glVertex2f(regionStartX + handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionStartX - handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionEndX - handleHalfWidth, y0);
+            glVertex2f(regionEndX + handleHalfWidth, y0);
+            glVertex2f(regionEndX + handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionEndX - handleHalfWidth, y0 + handleHeight);
+        glEnd();
+        glColor4f(0.035f, 0.032f, 0.030f, 1.0f);
+        glBegin(GL_QUADS);
+            glVertex2f(regionStartX - 4.5f, y0 + 2.0f);
+            glVertex2f(regionStartX + 4.5f, y0 + 2.0f);
+            glVertex2f(regionStartX + 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionStartX - 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionEndX - 4.5f, y0 + 2.0f);
+            glVertex2f(regionEndX + 4.5f, y0 + 2.0f);
+            glVertex2f(regionEndX + 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionEndX - 4.5f, y0 + handleHeight - 2.0f);
         glEnd();
 
         const float startX = regionStartX + fStartPosUi * (regionEndX - regionStartX);
@@ -908,7 +994,7 @@ void DrumCloudUI::onDisplay()
     {
         if (fLoadError) glColor4f(1.0f, 0.44f, 0.34f, 1.0f);
         else glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
-        drawPixelText(fLoadStatus.c_str(), 26.0f, 158.0f, 1.05f);
+        drawPixelText(fLoadStatus.c_str(), 26.0f, 192.0f, 1.05f);
     }
 
     for (const DrumCloudKnobSpec& spec : kDrumCloudKnobs)
@@ -916,9 +1002,9 @@ void DrumCloudUI::onDisplay()
 
     // Automatic pitch analysis controls and result.
     {
-        const float bx0 = W - 258.0f;
-        const float by0 = 60.0f;
-        const float bw = 120.0f;
+        const float bx0 = 18.0f;
+        const float by0 = 52.0f;
+        const float bw = 110.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -934,7 +1020,7 @@ void DrumCloudUI::onDisplay()
         glEnd();
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(fAutoRootUi >= 0.5f ? "AUTO ROOT ON" : "AUTO ROOT OFF",
-                      bx0 + 9.0f, by0 + 6.0f, 1.15f);
+                      bx0 + 7.0f, by0 + 6.0f, 1.05f);
     }
 
     {
@@ -946,9 +1032,9 @@ void DrumCloudUI::onDisplay()
         else
             std::snprintf(pitchBuf, sizeof(pitchBuf), "ROOT LOW CONF");
 
-        const float bx0 = W - 258.0f;
-        const float by0 = 88.0f;
-        const float bw = 120.0f;
+        const float bx0 = 136.0f;
+        const float by0 = 52.0f;
+        const float bw = 110.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -970,8 +1056,8 @@ void DrumCloudUI::onDisplay()
     {
         char scanBuf[24];
         std::snprintf(scanBuf, sizeof(scanBuf), "SCAN %.2f", fScanPosUI);
-        const float bx0 = W - 118.0f;
-        const float by0 = 88.0f;
+        const float bx0 = 342.0f;
+        const float by0 = 52.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
@@ -999,9 +1085,9 @@ void DrumCloudUI::onDisplay()
         }
         char modeBuf[20];
         std::snprintf(modeBuf, sizeof(modeBuf), "%s %d", modeName, fScanModeUi);
-        const float bx0 = W - 118.0f;
-        const float by0 = 60.0f;
-        const float bw = 90.0f;
+        const float bx0 = 254.0f;
+        const float by0 = 52.0f;
+        const float bw = 80.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
         glBegin(GL_QUADS);
@@ -1027,9 +1113,9 @@ void DrumCloudUI::onDisplay()
         default: break;
         }
 
-        const float bx0 = W - 258.0f;
-        const float by0 = 116.0f;
-        const float bw = 230.0f;
+        const float bx0 = 440.0f;
+        const float by0 = 52.0f;
+        const float bw = 150.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -1044,15 +1130,81 @@ void DrumCloudUI::onDisplay()
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(playbackName, bx0 + 9.0f, by0 + 6.0f, 1.15f);
     }
+
+    {
+        const float bx0 = 598.0f, by0 = 52.0f, bw = 92.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(fSliceModeUi ? 0.96f : 0.30f, fSliceModeUi ? 0.68f : 0.34f,
+                  fSliceModeUi ? 0.18f : 0.44f, 0.95f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        const char* sliceModeText = fSliceModeUi == 2 ? "SLICE TR" :
+                                    fSliceModeUi == 1 ? "SLICE EQ" : "SLICE OFF";
+        drawPixelText(sliceModeText, bx0 + 8.0f, by0 + 6.0f, 1.05f);
+    }
+
+    {
+        char sliceBuf[16];
+        const int actualSlices = fSliceBoundaryCountUi >= 2
+            ? int(fSliceBoundaryCountUi) - 1 : 0;
+        if (fSliceModeUi == 2)
+            std::snprintf(sliceBuf, sizeof(sliceBuf), "%d/%d", actualSlices, fSliceCountUi);
+        else
+            std::snprintf(sliceBuf, sizeof(sliceBuf), "N%d", fSliceCountUi);
+        const float bx0 = 698.0f, by0 = 52.0f, bw = 46.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.30f, 0.34f, 0.44f, 0.9f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(sliceBuf, bx0 + 6.0f, by0 + 6.0f, 0.88f);
+    }
+
+    {
+        char sensitivityBuf[16];
+        std::snprintf(sensitivityBuf, sizeof(sensitivityBuf), "S%02d",
+                      int(std::lround(fSliceSensitivityUi * 100.0f)));
+        const float bx0 = 752.0f, by0 = 52.0f, bw = 50.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.86f, 0.65f, 0.24f, 0.90f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(sensitivityBuf, bx0 + 6.0f, by0 + 6.0f, 0.88f);
+    }
+
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
 }
 
 bool DrumCloudUI::onMotion(const MotionEvent& ev)
 {
-    const float mx = (float)ev.pos.getX();
-    const float my = (float)ev.pos.getY();
+    const float scaleX = std::max(1.0f, static_cast<float>(getWidth())) / kDrumCloudUiWidth;
+    const float scaleY = std::max(1.0f, static_cast<float>(getHeight())) / kDrumCloudUiHeight;
+    const float mx = static_cast<float>(ev.pos.getX()) / scaleX;
+    const float my = static_cast<float>(ev.pos.getY()) / scaleY;
 
     const float wx0 = 18.0f;
-    const float wx1 = (float)getWidth() - 18.0f;
+    const float wx1 = kDrumCloudUiWidth - 18.0f;
 
     if (fDragSampleStart)
     {
@@ -1158,6 +1310,31 @@ void DrumCloudUI::uiIdle()
         repaint();
     }
     const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
+    const int activeSlice = gDrumCloudUiActiveSlice.load(std::memory_order_relaxed);
+    if (activeSlice != fActiveSliceUi)
+    {
+        fActiveSliceUi = activeSlice;
+        repaint();
+    }
+    bool sliceBoundariesChanged = false;
+    const uint32_t sliceBoundaryCount = std::min<uint32_t>(
+        gDrumCloudUiSliceBoundaryCount.load(std::memory_order_acquire), kUiSliceBoundaryCount);
+    if (sliceBoundaryCount != fSliceBoundaryCountUi)
+    {
+        fSliceBoundaryCountUi = sliceBoundaryCount;
+        sliceBoundariesChanged = true;
+    }
+    for (uint32_t i = 0; i < sliceBoundaryCount; ++i)
+    {
+        const float boundary = std::clamp(
+            gDrumCloudUiSliceBoundaries[i].load(std::memory_order_relaxed), 0.0f, 1.0f);
+        if (std::fabs(boundary - fSliceBoundariesUi[i]) > 0.0005f)
+        {
+            fSliceBoundariesUi[i] = boundary;
+            sliceBoundariesChanged = true;
+        }
+    }
+    if (sliceBoundariesChanged) repaint();
 
     const uint32_t detectedGeneration =
         gDrumCloudDetectedPitchGeneration.load(std::memory_order_acquire);
@@ -1209,24 +1386,29 @@ void DrumCloudUI::uiIdle()
 
 bool DrumCloudUI::onMouse(const MouseEvent& ev)
 {
-    const float mx = (float)ev.pos.getX();
-    const float my = (float)ev.pos.getY();
+    const float scaleX = std::max(1.0f, static_cast<float>(getWidth())) / kDrumCloudUiWidth;
+    const float scaleY = std::max(1.0f, static_cast<float>(getHeight())) / kDrumCloudUiHeight;
+    const float mx = static_cast<float>(ev.pos.getX()) / scaleX;
+    const float my = static_cast<float>(ev.pos.getY()) / scaleY;
     const float wx0 = 18.0f;
-    const float wx1 = (float)getWidth() - 18.0f;
-    const float wy0 = 52.0f;
-    const float wy1 = 176.0f;
+    const float wx1 = kDrumCloudUiWidth - 18.0f;
+    const float wy0 = 88.0f;
+    const float wy1 = 210.0f;
     const bool hitWave = (mx >= wx0 && mx <= wx1 && my >= wy0 && my <= wy1);
     const bool hitStartPosZone = hitWave && (my >= (wy1 - 16.0f) && my <= wy1);
     const float regionStartX = wx0 + fSampleStartUi * (wx1 - wx0);
     const float regionEndX = wx0 + fSampleEndUi * (wx1 - wx0);
-    const bool hitSampleStart = hitWave && std::fabs(mx - regionStartX) <= 7.0f;
-    const bool hitSampleEnd = hitWave && std::fabs(mx - regionEndX) <= 7.0f;
+    // Generous invisible hit areas around the thin marker lines prevent a
+    // near miss from falling through to the sample file chooser.
+    constexpr float sampleHandleHitRadius = 14.0f;
+    const bool hitSampleStart = hitWave && std::fabs(mx - regionStartX) <= sampleHandleHitRadius;
+    const bool hitSampleEnd = hitWave && std::fabs(mx - regionEndX) <= sampleHandleHitRadius;
 
     if (ev.button == 1 && ev.press)
     {
-        const float autoBx0 = (float)getWidth() - 258.0f;
-        const float autoBy0 = 60.0f;
-        const float autoBw = 120.0f;
+        const float autoBx0 = 18.0f;
+        const float autoBy0 = 52.0f;
+        const float autoBw = 110.0f;
         const float autoBh = 22.0f;
         if (mx >= autoBx0 && mx <= autoBx0 + autoBw &&
             my >= autoBy0 && my <= autoBy0 + autoBh)
@@ -1247,9 +1429,9 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float playbackBx0 = (float)getWidth() - 258.0f;
-        const float playbackBy0 = 116.0f;
-        const float playbackBw = 230.0f;
+        const float playbackBx0 = 440.0f;
+        const float playbackBy0 = 52.0f;
+        const float playbackBw = 150.0f;
         const float playbackBh = 22.0f;
         if (mx >= playbackBx0 && mx <= playbackBx0 + playbackBw &&
             my >= playbackBy0 && my <= playbackBy0 + playbackBh)
@@ -1273,9 +1455,41 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float modeBx0 = (float)getWidth() - 118.0f;
-        const float modeBy0 = 60.0f;
-        const float modeBw  = 90.0f;
+        if (mx >= 598.0f && mx <= 690.0f && my >= 52.0f && my <= 74.0f)
+        {
+            fSliceModeUi = (fSliceModeUi + 1) % 3;
+            editParameter(paramSliceMode, true);
+            setParameterValue(paramSliceMode, float(fSliceModeUi));
+            editParameter(paramSliceMode, false);
+            repaint();
+            return true;
+        }
+
+        if (mx >= 698.0f && mx <= 744.0f && my >= 52.0f && my <= 74.0f)
+        {
+            fSliceCountUi = (fSliceCountUi < 4) ? 4 : (fSliceCountUi < 8) ? 8 : (fSliceCountUi < 16) ? 16 : 2;
+            editParameter(paramSliceCount, true);
+            setParameterValue(paramSliceCount, float(fSliceCountUi));
+            editParameter(paramSliceCount, false);
+            repaint();
+            return true;
+        }
+
+        if (mx >= 752.0f && mx <= 802.0f && my >= 52.0f && my <= 74.0f)
+        {
+            int sensitivityPercent = int(std::lround(fSliceSensitivityUi * 100.0f));
+            sensitivityPercent = sensitivityPercent <= 0 ? 100 : sensitivityPercent - 10;
+            fSliceSensitivityUi = float(sensitivityPercent) / 100.0f;
+            editParameter(paramSliceSensitivity, true);
+            setParameterValue(paramSliceSensitivity, fSliceSensitivityUi);
+            editParameter(paramSliceSensitivity, false);
+            repaint();
+            return true;
+        }
+
+        const float modeBx0 = 254.0f;
+        const float modeBy0 = 52.0f;
+        const float modeBw  = 80.0f;
         const float modeBh  = 22.0f;
 
         if (mx >= modeBx0 && mx <= modeBx0 + modeBw &&
@@ -1448,6 +1662,9 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramDelayDamping) { fDelayDampingUi = value; repaint(); return; }
     if (index == paramTimeStretch) { fTimeStretchUi = value; repaint(); return; }
     if (index == paramPlaybackMode) { fPlaybackModeUi = (int)std::lround(value); repaint(); return; }
+    if (index == paramSliceMode) { fSliceModeUi = std::clamp((int)std::lround(value), 0, 2); repaint(); return; }
+    if (index == paramSliceCount) { fSliceCountUi = std::clamp((int)std::lround(value), 2, 16); repaint(); return; }
+    if (index == paramSliceSensitivity) { fSliceSensitivityUi = std::clamp(value, 0.0f, 1.0f); repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }
