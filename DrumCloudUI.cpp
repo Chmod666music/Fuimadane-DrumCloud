@@ -136,7 +136,7 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(820, 700)
+        : UI(820, 700, true)
     {
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
