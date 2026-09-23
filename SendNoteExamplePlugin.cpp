@@ -1250,13 +1250,30 @@ int copyEligibleTransientMarkers(int32_t* dst, int capacity) const noexcept
     if (dst == nullptr || capacity <= 0) return 0;
     const float inverseSensitivity = 1.0f - fSliceSensitivity;
     const float threshold = 0.0005f + 0.030f * inverseSensitivity * inverseSensitivity;
-    int count = 0;
-    for (int i = 0; i < transientMarkerCount && count < capacity; ++i)
+    int32_t candidates[kMaxMarkers]{};
+    float strengths[kMaxMarkers]{};
+    int candidateCount = 0;
+    for (int i = 0; i < transientMarkerCount && candidateCount < kMaxMarkers; ++i)
     {
-        if (i == 0 || markerStrengths[i] >= threshold)
-            dst[count++] = markers[i];
+        if (markerStrengths[i] >= threshold)
+        {
+            candidates[candidateCount] = markers[i];
+            strengths[candidateCount] = markerStrengths[i];
+            ++candidateCount;
+        }
     }
-    return count;
+
+    const int32_t regionStart = getRegionStartFrame();
+    const int32_t regionEnd = getRegionEndFrame();
+    const int32_t regionLength = std::max<int32_t>(1, regionEnd - regionStart + 1);
+    const float sourceRate = sampleSR > 0 ? float(sampleSR) : sr;
+    const int32_t minimumDistance = std::clamp<int32_t>(
+        regionLength / std::max(1, fSliceCount * 2),
+        int32_t(sourceRate * 0.120f), int32_t(sourceRate * 0.500f));
+    return DrumCloudSlicer::selectStrongestSpacedMarkers(
+        regionStart, regionEnd, candidates, strengths, candidateCount,
+        std::max(0, fSliceCount - 1), minimumDistance,
+        dst, capacity);
 }
 
 bool getVoiceRegionFrames(int note, int32_t& start, int32_t& end) const noexcept
