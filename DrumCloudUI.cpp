@@ -1605,13 +1605,20 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
         if (hitWave)
         {
-            std::string startDirectory = parentDirectory(fSamplePath);
-            if (startDirectory.empty()) readLastSampleFolder(startDirectory);
+            // Ask the host first so REAPER and other capable DAWs can present
+            // their normal native/system file chooser. Only fall back to DPF's
+            // browser when the host cannot handle state-file requests.
+            fChoosingSample = requestStateFile("samplePath");
+            if (!fChoosingSample)
+            {
+                std::string startDirectory = parentDirectory(fSamplePath);
+                if (startDirectory.empty()) readLastSampleFolder(startDirectory);
 
-            FileBrowserOptions options;
-            options.title = "DrumCloud: Load Sample";
-            options.startDir = startDirectory.empty() ? nullptr : startDirectory.c_str();
-            fChoosingSample = openFileBrowser(options);
+                FileBrowserOptions options;
+                options.title = "DrumCloud: Load Sample";
+                options.startDir = startDirectory.empty() ? nullptr : startDirectory.c_str();
+                fChoosingSample = openFileBrowser(options);
+            }
             return true;
         }
         return false;
@@ -1679,6 +1686,8 @@ void DrumCloudUI::stateChanged(const char* key, const char* value)
 
         const bool chosen = fChoosingSample && !fRestoringFromParam;
         fChoosingSample = false;
+        if (chosen)
+            writeLastSampleFolder(parentDirectory(newPath));
         {
             std::lock_guard<std::mutex> lock(fPreviewMutex);
             fPreviewPath = newPath;
