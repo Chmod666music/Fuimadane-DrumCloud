@@ -1,20 +1,26 @@
-# DrumCloud v1.9.0-beta.2
+# DrumCloud v1.9.0-beta.3
 
-This beta adds dedicated playback-boundary control to Fuimadane DrumCloud's
-polyphonic granular scanner.
+This milestone turns DrumCloud into a compact granular slicer instrument while
+making its dark-and-gold interface easier to use across different displays.
 
-## New in beta.2
+## New in beta.3
 
-- **PLAY LOOP**: scan from the selected start position to Sample End, then wrap
-- **PLAY ONE SHOT**: scan once to Sample End and stop creating new grains
-- **PLAY PING PONG**: alternate continuously between the sample-region boundaries
-- Independent playback position, direction and one-shot completion for every
-  active MIDI note, preventing polyphonic voices from moving each other's playhead
-- New notes retrigger from the selected start position
-- Existing grains finish through their natural release when ONE SHOT reaches the end
-- Playback Mode is a persistent automatable parameter and is recalled with projects
-- Dark-and-gold waveform control for selecting the playback behaviour
-- Corrected Linux regression checks for reliable binary portability validation
+- **SLICE EQ** divides the selected Sample Start/End region into 2–16 equal,
+  non-overlapping slices
+- **SLICE TR** detects real transient onsets throughout the complete sample
+- MIDI note 36 and upward trigger consecutive slices at the sample's original pitch
+- Polyphonic slice playback with independent, safe grain boundaries per voice
+- **SENS** changes transient sensitivity immediately without reloading the sample
+- Strongest suitably spaced attacks are selected across the region, preventing a
+  dense early cluster from consuming all available slices
+- Improved onset refinement places boundaries just before broad and low-frequency
+  attacks instead of inside their waveform peaks
+- Waveform slice boundaries and active-slice highlighting
+- Resizable, HiDPI-aware interface with correctly scaled drawing and pointer input
+- Playback and slicer controls moved above the waveform for a clearer overview
+- Compact gold Sample Start/End grab handles with wider hit areas, reducing
+  accidental sample-dialog openings
+- Slicer defaults to off, preserving the normal chromatic instrument workflow
 
 ## Downloads
 
@@ -25,8 +31,8 @@ polyphonic granular scanner.
 ## Validation status
 
 The Linux CLAP and VST3 builds passed the complete native regression suite and
-manual playback testing on Ubuntu Studio. Windows and macOS packages are
-cross-compiled automatically and still need real host testing.
+manual testing in REAPER. Automated Linux, Windows and macOS builds pass. The
+Windows and macOS packages remain beta builds that need testing in real hosts.
 
 ## Beta warning
 
