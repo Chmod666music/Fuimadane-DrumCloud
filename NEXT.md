@@ -26,6 +26,7 @@ Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggerin
 - Slice bounds are stored per grain so overlapping/polyphonic slices cannot move one another's playback region.
 - The waveform shows every boundary and highlights the last triggered slice. Slicer mode defaults to off, preserving old sessions and the normal chromatic instrument mode.
 - `SLICE TR` reuses the transient analysis performed during sample loading. Real detected onsets become slice starts; fallback snap-grid markers are deliberately excluded. The selected count acts as a maximum, and the UI reports detected/maximum slices.
+- Transient detection uses fast/slow envelopes, a peak-relative prominence floor and 60 ms retrigger suppression so low-level ringing does not create clusters of tiny slices.
 
 ## DrumCloud JS feature reference
 
