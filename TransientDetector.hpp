@@ -6,6 +6,44 @@
 
 namespace DrumCloudTransients {
 
+inline int32_t refineOnset(const float* left, const float* right, int32_t detected,
+                           int32_t frames, float sampleRate, float referenceLevel,
+                           float globalPeak) noexcept
+{
+    const int32_t block = std::max<int32_t>(8, int32_t(sampleRate * 0.001f));
+    const int32_t search = std::max<int32_t>(block, int32_t(sampleRate * 0.035f));
+    const int32_t first = std::max<int32_t>(0, detected - search);
+    const float quietThreshold = std::max(globalPeak * 0.0002f, referenceLevel * 0.10f);
+    int32_t quietEnd = -1;
+    int32_t minimumEnd = detected;
+    float minimumEnergy = 1.0e30f;
+
+    for (int32_t end = detected; end > first; end -= block)
+    {
+        const int32_t begin = std::max(first, end - block);
+        float energy = 0.0f;
+        for (int32_t i = begin; i < end; ++i)
+        {
+            const float mono = right != nullptr ? 0.5f * (left[i] + right[i]) : left[i];
+            energy += std::fabs(mono);
+        }
+        energy /= float(std::max<int32_t>(1, end - begin));
+        if (energy < minimumEnergy)
+        {
+            minimumEnergy = energy;
+            minimumEnd = end;
+        }
+        if (energy <= quietThreshold)
+        {
+            quietEnd = end;
+            break;
+        }
+    }
+
+    const int32_t onset = quietEnd >= 0 ? quietEnd : minimumEnd;
+    return std::clamp<int32_t>(onset, 0, std::max<int32_t>(0, frames - 1));
+}
+
 inline int detect(const float* left, const float* right, int32_t frames,
                   float sampleRate, int32_t* markers, int capacity,
                   float* strengths = nullptr) noexcept
@@ -49,6 +87,8 @@ inline int detect(const float* left, const float* right, int32_t frames,
             i - lastMarker >= minimumDistance)
         {
             const float strength = std::clamp(novelty / peak, 0.0f, 1.0f);
+            const int32_t onset = refineOnset(left, right, i, frames, sr,
+                                              fastEnvelope, peak);
             int slot = -1;
             if (count < capacity)
             {
@@ -64,7 +104,7 @@ inline int detect(const float* left, const float* right, int32_t frames,
 
             if (slot >= 0)
             {
-                markers[slot] = i;
+                markers[slot] = onset;
                 if (strengths != nullptr) strengths[slot] = strength;
             }
             lastMarker = i;
