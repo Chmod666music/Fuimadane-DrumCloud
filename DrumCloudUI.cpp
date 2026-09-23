@@ -141,6 +141,52 @@ static bool cacheRead(uint32_t id, std::string& outPath)
     return false;
 }
 
+static std::string parentDirectory(const std::string& path)
+{
+    const std::string::size_type separator = path.find_last_of("/\\");
+    return separator == std::string::npos ? std::string() : path.substr(0, separator);
+}
+
+static std::string getLastSampleFolderCachePath()
+{
+#if defined(_WIN32)
+    if (const char* const appData = std::getenv("APPDATA"))
+        return std::string(appData) + "/drumcloud-last-folder.txt";
+#elif defined(__APPLE__)
+    if (const char* const home = std::getenv("HOME"))
+        return std::string(home) + "/Library/Preferences/Fuimadane-DrumCloud-last-folder.txt";
+#else
+    if (const char* const config = std::getenv("XDG_CONFIG_HOME"))
+        return std::string(config) + "/drumcloud-last-folder.txt";
+    if (const char* const home = std::getenv("HOME"))
+        return std::string(home) + "/.config/drumcloud-last-folder.txt";
+#endif
+    return "/tmp/drumcloud-last-folder.txt";
+}
+
+static bool readLastSampleFolder(std::string& folder)
+{
+    folder.clear();
+    FILE* const fp = std::fopen(getLastSampleFolderCachePath().c_str(), "r");
+    if (fp == nullptr) return false;
+    char value[4096]{};
+    const bool ok = std::fgets(value, sizeof(value), fp) != nullptr;
+    std::fclose(fp);
+    if (!ok) return false;
+    value[std::strcspn(value, "\r\n")] = '\0';
+    folder = value;
+    return !folder.empty();
+}
+
+static void writeLastSampleFolder(const std::string& folder)
+{
+    if (folder.empty()) return;
+    FILE* const fp = std::fopen(getLastSampleFolderCachePath().c_str(), "w");
+    if (fp == nullptr) return;
+    std::fprintf(fp, "%s\n", folder.c_str());
+    std::fclose(fp);
+}
+
 class DrumCloudUI : public UI
 {
 public:
@@ -172,6 +218,7 @@ protected:
     void uiIdle() override;
     bool onMouse(const MouseEvent& ev) override;
     bool onMotion(const MotionEvent& ev) override;
+    void uiFileBrowserSelected(const char* filename) override;
 
 private:
     static constexpr int kWavePreviewSize = 1024;
@@ -1558,8 +1605,13 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
         if (hitWave)
         {
-            fChoosingSample = true;
-            requestStateFile("samplePath");
+            std::string startDirectory = parentDirectory(fSamplePath);
+            if (startDirectory.empty()) readLastSampleFolder(startDirectory);
+
+            FileBrowserOptions options;
+            options.title = "DrumCloud: Load Sample";
+            options.startDir = startDirectory.empty() ? nullptr : startDirectory.c_str();
+            fChoosingSample = openFileBrowser(options);
             return true;
         }
         return false;
@@ -1595,6 +1647,23 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     }
 
     return false;
+}
+
+void DrumCloudUI::uiFileBrowserSelected(const char* filename)
+{
+    if (!fChoosingSample)
+        return;
+
+    if (filename == nullptr || filename[0] == '\0')
+    {
+        fChoosingSample = false;
+        return;
+    }
+
+    const std::string selectedPath(filename);
+    writeLastSampleFolder(parentDirectory(selectedPath));
+    setState("samplePath", selectedPath.c_str());
+    stateChanged("samplePath", selectedPath.c_str());
 }
 
 void DrumCloudUI::stateChanged(const char* key, const char* value)
