@@ -27,6 +27,9 @@ Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggerin
 - The waveform shows every boundary and highlights the last triggered slice. Slicer mode defaults to off, preserving old sessions and the normal chromatic instrument mode.
 - `SLICE TR` reuses the transient analysis performed during sample loading. Real detected onsets become slice starts; fallback snap-grid markers are deliberately excluded. The selected count acts as a maximum, and the UI reports detected/maximum slices.
 - Transient detection uses fast/slow envelopes, a peak-relative prominence floor and 60 ms retrigger suppression so low-level ringing does not create clusters of tiny slices.
+- `SENS` filters the stored transient candidates immediately without reloading or reanalysing the sample. Higher values include softer details; lower values keep only stronger attacks.
+
+Future slicer editing: allow transient boundaries to be dragged on the waveform, add/remove markers manually, and persist the edited marker map with the plugin state.
 
 ## DrumCloud JS feature reference
 
