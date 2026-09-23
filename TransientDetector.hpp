@@ -90,9 +90,38 @@ inline int detect(const float* left, const float* right, int32_t frames,
         if (prominent && novelty > std::max(adaptiveThreshold, absoluteThreshold) &&
             i - lastMarker >= minimumDistance)
         {
-            const float strength = std::clamp(novelty / peak, 0.0f, 1.0f);
-            const int32_t onset = refineOnset(left, right, i, frames, sr,
-                                              fastEnvelope, peak);
+            // Novelty alone overvalues tiny, click-like attacks and can make a
+            // quiet tick outrank the main drum hit. Measure the event's actual
+            // peak around the threshold crossing as well. Peak level carries
+            // most of the musical-importance score, while novelty still helps
+            // distinguish a real new onset from a loud sustained tail.
+            const int32_t peakLookBehind = std::max<int32_t>(1, int32_t(sr * 0.010f));
+            const int32_t peakLookAhead = std::max<int32_t>(1, int32_t(sr * 0.080f));
+            const int32_t peakFirst = std::max<int32_t>(0, i - peakLookBehind);
+            const int32_t peakLast = std::min<int32_t>(frames, i + peakLookAhead);
+            float eventPeak = 0.0f;
+            int32_t eventPeakFrame = i;
+            for (int32_t peakFrame = peakFirst; peakFrame < peakLast; ++peakFrame)
+            {
+                const float peakMono = right != nullptr
+                    ? 0.5f * (left[peakFrame] + right[peakFrame])
+                    : left[peakFrame];
+                const float peakMagnitude = std::fabs(peakMono);
+                if (peakMagnitude > eventPeak)
+                {
+                    eventPeak = peakMagnitude;
+                    eventPeakFrame = peakFrame;
+                }
+            }
+            const float noveltyStrength = std::clamp(novelty / peak, 0.0f, 1.0f);
+            const float peakStrength = std::clamp(eventPeak / peak, 0.0f, 1.0f);
+            const float strength = 0.35f * noveltyStrength + 0.65f * peakStrength;
+            // The strongest peak may be tens of milliseconds after the first
+            // detector crossing. Refine backwards from that chosen peak so a
+            // candidate cannot inherit an early tail fluctuation as its slice
+            // boundary while borrowing strength from the following main hit.
+            const int32_t onset = refineOnset(left, right, eventPeakFrame, frames,
+                                              sr, eventPeak, peak);
             int slot = -1;
             if (count < capacity)
             {
@@ -119,12 +148,12 @@ inline int detect(const float* left, const float* right, int32_t frames,
     }
 
     // Replacement above is strength-based; restore chronological playback order.
-    for (int i = 2; i < count; ++i)
+    for (int i = 1; i < count; ++i)
     {
         const int32_t marker = markers[i];
         const float strength = strengths != nullptr ? strengths[i] : 0.0f;
         int j = i;
-        while (j > 1 && markers[j - 1] > marker)
+        while (j > 0 && markers[j - 1] > marker)
         {
             markers[j] = markers[j - 1];
             if (strengths != nullptr) strengths[j] = strengths[j - 1];

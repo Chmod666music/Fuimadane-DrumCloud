@@ -36,7 +36,7 @@ int main()
     assert(markers[1] <= 12050); // refine to the attack edge, not inside its peak
     int strongHits = 0;
     for (int i = 1; i < count; ++i)
-        if (strengths[i] >= 0.012f) ++strongHits;
+        if (strengths[i] >= 0.10f) ++strongHits;
     assert(strongHits == 3);
 
     // A slower low-frequency attack must refine to its leading edge rather
@@ -57,6 +57,32 @@ int main()
     assert(slowCount >= 2);
     assert(slowMarkers[1] >= slowStart - 500);
     assert(slowMarkers[1] <= slowStart + 250);
+
+    // A tiny but extremely sharp click must not outrank a clearly louder
+    // musical hit merely because its envelope rises faster.
+    std::vector<float> variedHits(48000, 0.0f);
+    for (int i = 0; i < 300 && 8000 + i < int(variedHits.size()); ++i)
+        variedHits[8000 + i] = 0.08f * std::exp(-float(i) / 35.0f);
+    for (int i = 0; i < 2400 && 24000 + i < int(variedHits.size()); ++i)
+    {
+        const float envelope = std::exp(-float(i) / 600.0f);
+        variedHits[24000 + i] = 0.85f * envelope * std::sin(float(i) * 0.12f);
+    }
+    int32_t variedMarkers[8]{};
+    float variedStrengths[8]{};
+    const int variedCount = DrumCloudTransients::detect(
+        variedHits.data(), variedHits.data(), int32_t(variedHits.size()),
+        sampleRate, variedMarkers, 8, variedStrengths);
+    assert(variedCount >= 3);
+    int quietIndex = -1;
+    int loudIndex = -1;
+    for (int i = 1; i < variedCount; ++i)
+    {
+        if (std::abs(variedMarkers[i] - 8000) < 1000) quietIndex = i;
+        if (std::abs(variedMarkers[i] - 24000) < 500) loudIndex = i;
+    }
+    assert(quietIndex >= 0 && loudIndex >= 0);
+    assert(variedStrengths[loudIndex] > variedStrengths[quietIndex] * 2.0f);
 
     // More candidates than capacity must still scan the complete sample.
     std::vector<float> dense(48000 * 12, 0.0f);
