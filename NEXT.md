@@ -31,6 +31,7 @@ Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggerin
 - Transient analysis scans the entire sample even when its bounded candidate buffer fills. It retains the strongest candidates in chronological order, so long or transient-dense files still produce slices after late Sample Start positions.
 - When the requested transient slice count is lower than the number of candidates, DrumCloud now chooses the strongest reasonably spaced attacks across the selected region, then restores chronological order. A dense cluster can no longer consume all available slices.
 - Detected transient positions are refined backwards by up to 100 ms in robust 3 ms energy blocks, with a small pre-roll at the quiet edge. This avoids both late cuts inside broad attacks and false silence readings at low-frequency zero crossings.
+- Sample Start and End have compact gold grab handles plus wider invisible hit areas. Near-marker clicks begin a boundary drag instead of accidentally opening the sample chooser.
 
 Future slicer editing: allow transient boundaries to be dragged on the waveform, add/remove markers manually, and persist the edited marker map with the plugin state.
 
