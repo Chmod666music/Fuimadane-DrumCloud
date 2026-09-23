@@ -2,6 +2,13 @@
 
 The native C++/DPF instrument and DrumCloud JS are separate plugins. Use the native v1.8.1 release tag as the baseline; preserve existing parameter indices and plugin IDs so saved host projects still reopen. Target Linux, Windows and macOS from one DSP codebase; build and package separately for each platform.
 
+## Completed for v1.9.0-beta.4: sample-browser hotfix
+
+- The native sample browser now remembers the most recently used folder across browser closes, plugin instances, projects and application restarts.
+- When a sample is already loaded, the browser opens in that sample's parent folder. Otherwise it uses the saved folder and falls back safely to Home.
+- The existing asynchronous validation and sample-loading path is preserved.
+- Manual Linux CLAP/VST3 testing passed, including closing and reopening the browser. Automated Linux, Windows and macOS builds pass.
+
 ## Completed for v1.9.0-beta.2: sample playback modes
 
 The `PLAY MODE` control is implemented for the main sample/scanner playhead between Sample Start and Sample End:
