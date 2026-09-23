@@ -39,6 +39,25 @@ int main()
         if (strengths[i] >= 0.012f) ++strongHits;
     assert(strongHits == 3);
 
+    // A slower low-frequency attack must refine to its leading edge rather
+    // than a quiet zero crossing inside the waveform.
+    std::vector<float> slowAttack(48000, 0.0f);
+    constexpr int slowStart = 12000;
+    for (int i = 0; i < 4800; ++i)
+    {
+        const float rise = std::min(1.0f, float(i) / 1200.0f);
+        const float decay = std::exp(-float(i) / 1800.0f);
+        slowAttack[slowStart + i] = rise * decay * std::sin(float(i) * 0.008f);
+    }
+    int32_t slowMarkers[8]{};
+    float slowStrengths[8]{};
+    const int slowCount = DrumCloudTransients::detect(
+        slowAttack.data(), slowAttack.data(), int32_t(slowAttack.size()),
+        sampleRate, slowMarkers, 8, slowStrengths);
+    assert(slowCount >= 2);
+    assert(slowMarkers[1] >= slowStart - 500);
+    assert(slowMarkers[1] <= slowStart + 250);
+
     // More candidates than capacity must still scan the complete sample.
     std::vector<float> dense(48000 * 12, 0.0f);
     for (int hit = 1; hit < 110; ++hit)
