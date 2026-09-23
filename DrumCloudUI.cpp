@@ -27,9 +27,9 @@
 namespace DISTRHO {
 
 static constexpr float kDrumCloudUiWidth = 820.0f;
-static constexpr float kDrumCloudUiHeight = 700.0f;
+static constexpr float kDrumCloudUiHeight = 740.0f;
 static constexpr uint kDrumCloudUiMinWidth = 615;
-static constexpr uint kDrumCloudUiMinHeight = 525;
+static constexpr uint kDrumCloudUiMinHeight = 555;
 
 struct DrumCloudKnobSpec
 {
@@ -42,42 +42,42 @@ struct DrumCloudKnobSpec
 
 static constexpr DrumCloudKnobSpec kDrumCloudKnobs[] = {
     // Voice / grain
-    { paramVolume, 70.0f, 248.0f, 19.0f, "VOL" },
-    { paramDensity, 162.0f, 248.0f, 19.0f, "DENS" },
-    { paramRelease, 254.0f, 248.0f, 19.0f, "REL" },
-    { paramVelocityToDensity, 346.0f, 248.0f, 19.0f, "V DENS" },
-    { paramVelocityToGrainSize, 70.0f, 326.0f, 19.0f, "V GSIZ" },
-    { paramPitchRate, 162.0f, 326.0f, 19.0f, "PITCH" },
-    { paramGrainAttack, 254.0f, 326.0f, 19.0f, "G ATK" },
-    { paramGrainRelease, 346.0f, 326.0f, 19.0f, "G REL" },
+    { paramVolume, 70.0f, 282.0f, 19.0f, "VOL" },
+    { paramDensity, 162.0f, 282.0f, 19.0f, "DENS" },
+    { paramRelease, 254.0f, 282.0f, 19.0f, "REL" },
+    { paramVelocityToDensity, 346.0f, 282.0f, 19.0f, "V DENS" },
+    { paramVelocityToGrainSize, 70.0f, 360.0f, 19.0f, "V GSIZ" },
+    { paramPitchRate, 162.0f, 360.0f, 19.0f, "PITCH" },
+    { paramGrainAttack, 254.0f, 360.0f, 19.0f, "G ATK" },
+    { paramGrainRelease, 346.0f, 360.0f, 19.0f, "G REL" },
 
     // Position / motion
-    { paramStartPosition, 470.0f, 248.0f, 19.0f, "START" },
-    { paramPositionSpread, 562.0f, 248.0f, 19.0f, "SPREAD" },
-    { paramScanSpeed, 654.0f, 248.0f, 19.0f, "SCAN" },
-    { paramSyncRate, 746.0f, 248.0f, 19.0f, "SYNC" },
-    { paramScanJumpRate, 470.0f, 326.0f, 19.0f, "J RATE" },
-    { paramScanJumpAmount, 562.0f, 326.0f, 19.0f, "J AMNT" },
-    { paramScanJumpSmoothMs, 654.0f, 326.0f, 19.0f, "J SMTH" },
-    { paramTimeStretch, 746.0f, 326.0f, 19.0f, "STRETCH" },
+    { paramStartPosition, 470.0f, 282.0f, 19.0f, "START" },
+    { paramPositionSpread, 562.0f, 282.0f, 19.0f, "SPREAD" },
+    { paramScanSpeed, 654.0f, 282.0f, 19.0f, "SCAN" },
+    { paramSyncRate, 746.0f, 282.0f, 19.0f, "SYNC" },
+    { paramScanJumpRate, 470.0f, 360.0f, 19.0f, "J RATE" },
+    { paramScanJumpAmount, 562.0f, 360.0f, 19.0f, "J AMNT" },
+    { paramScanJumpSmoothMs, 654.0f, 360.0f, 19.0f, "J SMTH" },
+    { paramTimeStretch, 746.0f, 360.0f, 19.0f, "STRETCH" },
 
     // Tone / pitch
-    { paramFilter, 72.0f, 454.0f, 20.0f, "FILTER" },
-    { paramResonance, 166.0f, 454.0f, 20.0f, "RESO" },
-    { paramRootNote, 260.0f, 454.0f, 20.0f, "ROOT" },
-    { paramSampleFineTune, 354.0f, 454.0f, 20.0f, "FINE" },
+    { paramFilter, 72.0f, 488.0f, 20.0f, "FILTER" },
+    { paramResonance, 166.0f, 488.0f, 20.0f, "RESO" },
+    { paramRootNote, 260.0f, 488.0f, 20.0f, "ROOT" },
+    { paramSampleFineTune, 354.0f, 488.0f, 20.0f, "FINE" },
 
     // Reverb
-    { paramReverbSize, 548.0f, 454.0f, 22.0f, "SIZE" },
-    { paramReverbMix, 680.0f, 454.0f, 22.0f, "MIX" },
+    { paramReverbSize, 548.0f, 488.0f, 22.0f, "SIZE" },
+    { paramReverbMix, 680.0f, 488.0f, 22.0f, "MIX" },
 
     // Delay
-    { paramDelayMode, 80.0f, 594.0f, 20.0f, "MODE" },
-    { paramDelayTimeLeft, 212.0f, 594.0f, 20.0f, "TIME L" },
-    { paramDelayTimeRight, 344.0f, 594.0f, 20.0f, "TIME R" },
-    { paramDelayFeedback, 476.0f, 594.0f, 20.0f, "FDBK" },
-    { paramDelayMix, 608.0f, 594.0f, 20.0f, "MIX" },
-    { paramDelayDamping, 740.0f, 594.0f, 20.0f, "DAMP" }
+    { paramDelayMode, 80.0f, 628.0f, 20.0f, "MODE" },
+    { paramDelayTimeLeft, 212.0f, 628.0f, 20.0f, "TIME L" },
+    { paramDelayTimeRight, 344.0f, 628.0f, 20.0f, "TIME R" },
+    { paramDelayFeedback, 476.0f, 628.0f, 20.0f, "FDBK" },
+    { paramDelayMix, 608.0f, 628.0f, 20.0f, "MIX" },
+    { paramDelayDamping, 740.0f, 628.0f, 20.0f, "DAMP" }
 };
 
 extern std::atomic<float> gDrumCloudUiScanPos;
@@ -141,9 +141,9 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(820, 700)
+        : UI(820, 740)
     {
-        // Keep a 4:3-ish fixed aspect ratio, but allow manual resizing down to 75%.
+        // Keep the interface aspect ratio fixed, but allow manual resizing down to 75%.
         // Rendering and pointer input are scaled explicitly below because this UI
         // uses raw OpenGL coordinates.
         setGeometryConstraints(kDrumCloudUiMinWidth, kDrumCloudUiMinHeight,
@@ -766,8 +766,8 @@ void DrumCloudUI::onDisplay()
     glPushMatrix();
     glLoadIdentity();
     glScalef(scaleX, scaleY, 1.0f);
-    const float waveTop = 52.0f;
-    const float waveBottom = 176.0f;
+    const float waveTop = 88.0f;
+    const float waveBottom = 210.0f;
     const float mid = 0.5f * (waveTop + waveBottom);
 
     glDisable(GL_TEXTURE_2D);
@@ -795,11 +795,11 @@ void DrumCloudUI::onDisplay()
         glVertex2f(W - 18.0f, waveBottom); glVertex2f(18.0f, waveBottom);
     glEnd();
 
-    drawPanel(18.0f, 192.0f, 384.0f, 188.0f, "VOICE / GRAIN");
-    drawPanel(418.0f, 192.0f, 384.0f, 188.0f, "POSITION / MOTION");
-    drawPanel(18.0f, 396.0f, 384.0f, 124.0f, "TONE / PITCH");
-    drawPanel(418.0f, 396.0f, 384.0f, 124.0f, "REVERB");
-    drawPanel(18.0f, 536.0f, 784.0f, 146.0f, "FILTERED DELAY");
+    drawPanel(18.0f, 226.0f, 384.0f, 188.0f, "VOICE / GRAIN");
+    drawPanel(418.0f, 226.0f, 384.0f, 188.0f, "POSITION / MOTION");
+    drawPanel(18.0f, 430.0f, 384.0f, 124.0f, "TONE / PITCH");
+    drawPanel(418.0f, 430.0f, 384.0f, 124.0f, "REVERB");
+    drawPanel(18.0f, 570.0f, 784.0f, 146.0f, "FILTERED DELAY");
 
     glLineWidth(1.0f);
     glColor4f(0.25f, 0.25f, 0.28f, 1.0f);
@@ -930,7 +930,7 @@ void DrumCloudUI::onDisplay()
     {
         if (fLoadError) glColor4f(1.0f, 0.44f, 0.34f, 1.0f);
         else glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
-        drawPixelText(fLoadStatus.c_str(), 26.0f, 158.0f, 1.05f);
+        drawPixelText(fLoadStatus.c_str(), 26.0f, 192.0f, 1.05f);
     }
 
     for (const DrumCloudKnobSpec& spec : kDrumCloudKnobs)
@@ -938,8 +938,8 @@ void DrumCloudUI::onDisplay()
 
     // Automatic pitch analysis controls and result.
     {
-        const float bx0 = W - 258.0f;
-        const float by0 = 60.0f;
+        const float bx0 = 18.0f;
+        const float by0 = 52.0f;
         const float bw = 120.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
@@ -968,8 +968,8 @@ void DrumCloudUI::onDisplay()
         else
             std::snprintf(pitchBuf, sizeof(pitchBuf), "ROOT LOW CONF");
 
-        const float bx0 = W - 258.0f;
-        const float by0 = 88.0f;
+        const float bx0 = 146.0f;
+        const float by0 = 52.0f;
         const float bw = 120.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
@@ -992,8 +992,8 @@ void DrumCloudUI::onDisplay()
     {
         char scanBuf[24];
         std::snprintf(scanBuf, sizeof(scanBuf), "SCAN %.2f", fScanPosUI);
-        const float bx0 = W - 118.0f;
-        const float by0 = 88.0f;
+        const float bx0 = 372.0f;
+        const float by0 = 52.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
@@ -1021,8 +1021,8 @@ void DrumCloudUI::onDisplay()
         }
         char modeBuf[20];
         std::snprintf(modeBuf, sizeof(modeBuf), "%s %d", modeName, fScanModeUi);
-        const float bx0 = W - 118.0f;
-        const float by0 = 60.0f;
+        const float bx0 = 274.0f;
+        const float by0 = 52.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
@@ -1049,9 +1049,9 @@ void DrumCloudUI::onDisplay()
         default: break;
         }
 
-        const float bx0 = W - 258.0f;
-        const float by0 = 116.0f;
-        const float bw = 230.0f;
+        const float bx0 = 470.0f;
+        const float by0 = 52.0f;
+        const float bw = 332.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -1242,8 +1242,8 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     const float my = static_cast<float>(ev.pos.getY()) / scaleY;
     const float wx0 = 18.0f;
     const float wx1 = kDrumCloudUiWidth - 18.0f;
-    const float wy0 = 52.0f;
-    const float wy1 = 176.0f;
+    const float wy0 = 88.0f;
+    const float wy1 = 210.0f;
     const bool hitWave = (mx >= wx0 && mx <= wx1 && my >= wy0 && my <= wy1);
     const bool hitStartPosZone = hitWave && (my >= (wy1 - 16.0f) && my <= wy1);
     const float regionStartX = wx0 + fSampleStartUi * (wx1 - wx0);
@@ -1253,8 +1253,8 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
     if (ev.button == 1 && ev.press)
     {
-        const float autoBx0 = kDrumCloudUiWidth - 258.0f;
-        const float autoBy0 = 60.0f;
+        const float autoBx0 = 18.0f;
+        const float autoBy0 = 52.0f;
         const float autoBw = 120.0f;
         const float autoBh = 22.0f;
         if (mx >= autoBx0 && mx <= autoBx0 + autoBw &&
@@ -1276,9 +1276,9 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float playbackBx0 = kDrumCloudUiWidth - 258.0f;
-        const float playbackBy0 = 116.0f;
-        const float playbackBw = 230.0f;
+        const float playbackBx0 = 470.0f;
+        const float playbackBy0 = 52.0f;
+        const float playbackBw = 332.0f;
         const float playbackBh = 22.0f;
         if (mx >= playbackBx0 && mx <= playbackBx0 + playbackBw &&
             my >= playbackBy0 && my <= playbackBy0 + playbackBh)
@@ -1302,8 +1302,8 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float modeBx0 = kDrumCloudUiWidth - 118.0f;
-        const float modeBy0 = 60.0f;
+        const float modeBx0 = 274.0f;
+        const float modeBy0 = 52.0f;
         const float modeBw  = 90.0f;
         const float modeBh  = 22.0f;
 
