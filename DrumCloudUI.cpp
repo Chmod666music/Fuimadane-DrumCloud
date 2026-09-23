@@ -184,6 +184,7 @@ private:
     int   fPlaybackModeUi = 0;
     int   fSliceModeUi = 0;
     int   fSliceCountUi = 8;
+    float fSliceSensitivityUi = 0.5f;
     int   fActiveSliceUi = -1;
     uint32_t fSliceBoundaryCountUi = 0;
     float fSliceBoundariesUi[kUiSliceBoundaryCount]{};
@@ -1122,14 +1123,14 @@ void DrumCloudUI::onDisplay()
     }
 
     {
-        char sliceBuf[24];
+        char sliceBuf[16];
         const int actualSlices = fSliceBoundaryCountUi >= 2
             ? int(fSliceBoundaryCountUi) - 1 : 0;
         if (fSliceModeUi == 2)
-            std::snprintf(sliceBuf, sizeof(sliceBuf), "TR %d/%d M36", actualSlices, fSliceCountUi);
+            std::snprintf(sliceBuf, sizeof(sliceBuf), "%d/%d", actualSlices, fSliceCountUi);
         else
-            std::snprintf(sliceBuf, sizeof(sliceBuf), "%d @ MIDI36", fSliceCountUi);
-        const float bx0 = 698.0f, by0 = 52.0f, bw = 104.0f, bh = 22.0f;
+            std::snprintf(sliceBuf, sizeof(sliceBuf), "N%d", fSliceCountUi);
+        const float bx0 = 698.0f, by0 = 52.0f, bw = 46.0f, bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
             glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
@@ -1141,7 +1142,26 @@ void DrumCloudUI::onDisplay()
             glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
         glEnd();
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
-        drawPixelText(sliceBuf, bx0 + 7.0f, by0 + 6.0f, 0.92f);
+        drawPixelText(sliceBuf, bx0 + 6.0f, by0 + 6.0f, 0.88f);
+    }
+
+    {
+        char sensitivityBuf[16];
+        std::snprintf(sensitivityBuf, sizeof(sensitivityBuf), "S%02d",
+                      int(std::lround(fSliceSensitivityUi * 100.0f)));
+        const float bx0 = 752.0f, by0 = 52.0f, bw = 50.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.86f, 0.65f, 0.24f, 0.90f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(sensitivityBuf, bx0 + 6.0f, by0 + 6.0f, 0.88f);
     }
 
     glMatrixMode(GL_MODELVIEW);
@@ -1414,12 +1434,24 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        if (mx >= 698.0f && mx <= 802.0f && my >= 52.0f && my <= 74.0f)
+        if (mx >= 698.0f && mx <= 744.0f && my >= 52.0f && my <= 74.0f)
         {
             fSliceCountUi = (fSliceCountUi < 4) ? 4 : (fSliceCountUi < 8) ? 8 : (fSliceCountUi < 16) ? 16 : 2;
             editParameter(paramSliceCount, true);
             setParameterValue(paramSliceCount, float(fSliceCountUi));
             editParameter(paramSliceCount, false);
+            repaint();
+            return true;
+        }
+
+        if (mx >= 752.0f && mx <= 802.0f && my >= 52.0f && my <= 74.0f)
+        {
+            int sensitivityPercent = int(std::lround(fSliceSensitivityUi * 100.0f));
+            sensitivityPercent = sensitivityPercent <= 0 ? 100 : sensitivityPercent - 10;
+            fSliceSensitivityUi = float(sensitivityPercent) / 100.0f;
+            editParameter(paramSliceSensitivity, true);
+            setParameterValue(paramSliceSensitivity, fSliceSensitivityUi);
+            editParameter(paramSliceSensitivity, false);
             repaint();
             return true;
         }
@@ -1601,6 +1633,7 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramPlaybackMode) { fPlaybackModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramSliceMode) { fSliceModeUi = std::clamp((int)std::lround(value), 0, 2); repaint(); return; }
     if (index == paramSliceCount) { fSliceCountUi = std::clamp((int)std::lround(value), 2, 16); repaint(); return; }
+    if (index == paramSliceSensitivity) { fSliceSensitivityUi = std::clamp(value, 0.0f, 1.0f); repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }
