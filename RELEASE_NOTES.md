@@ -1,18 +1,24 @@
-# DrumCloud v1.9.0-beta.4
+# DrumCloud v1.9.0-beta.5
 
-This hotfix supersedes beta.3. It keeps the complete scalable-UI and MIDI-slicer
-milestone while restoring a faster, more familiar sample-loading workflow.
+This release supersedes beta.4 and completes the first transient-slicer
+milestone. Its slice placement and sample-browser workflow have been manually
+verified on Linux in REAPER.
 
-## Fixed in beta.4
+## Fixed and improved in beta.5
 
-- The native sample browser remembers the last used folder across browser
-  closes, plugin instances, projects and application restarts
-- If a sample is already loaded, the browser opens in that sample's folder
-- A saved last folder is used when no sample is loaded, with Home as a safe
-  fallback
-- The existing asynchronous validation and sample-loading path remains intact
+- Fixed incorrect transient slices caused by marker positions and their
+  strength values becoming misaligned while duplicate markers were removed
+- Transient positions and strengths now remain paired through sorting and
+  compaction, so the strongest musical attacks select the correct boundaries
+- Slice candidates are ranked using both onset novelty and the actual event
+  peak, preventing tiny sharp clicks from outranking stronger hits
+- Attack positions are refined backwards from the selected event peak for
+  cleaner placement before the audible transient
+- Restored the host/native sample chooser in capable DAWs, with DPF's browser
+  retained as a fallback
+- Last-folder persistence remains active after selecting a sample
 
-## Included from beta.3
+## Slicer and interface milestone
 
 - Equal and transient-detected MIDI slicing with 2–16 slices
 - Adjustable transient sensitivity and refined onset placement
@@ -30,10 +36,10 @@ milestone while restoring a faster, more familiar sample-loading workflow.
 
 ## Validation status
 
-Manual Linux CLAP and VST3 testing passed, including loading a sample, closing
-the chooser and reopening it in the remembered folder. Automated Linux, Windows
-and macOS builds pass. Windows and macOS packages remain beta builds that need
-testing in real hosts.
+Manual Linux CLAP and VST3 testing passed, including sample loading, remembered
+folder behavior, transient placement and MIDI slice playback. Automated Linux,
+Windows and macOS builds pass. Windows and macOS packages remain beta builds
+that need testing in real hosts.
 
 ## Beta warning
 
