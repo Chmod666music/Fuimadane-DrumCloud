@@ -531,8 +531,8 @@ public:
         std::vector<float> left, right;
         uint32_t sampleRate = 0;
         int length = 0;
-        int32_t markers[64]{};
-        float markerStrengths[64]{};
+        int32_t markers[256]{};
+        float markerStrengths[256]{};
         int markerCount = 0;
         int transientMarkerCount = 0;
         float waveMin[1024]{};
@@ -1999,7 +1999,7 @@ private:
 
 
 
-    static constexpr int kMaxMarkers = 64;
+    static constexpr int kMaxMarkers = 256;
     int32_t markers[kMaxMarkers]{};
     float markerStrengths[kMaxMarkers]{};
     int markerCount = 0;
