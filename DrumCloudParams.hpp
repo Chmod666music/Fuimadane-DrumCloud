@@ -43,5 +43,6 @@ enum DrumCloudParams
     // Slicer additions: append only to preserve every earlier parameter ID.
     paramSliceMode,
     paramSliceCount,
+    paramSliceSensitivity,
     paramCount
 };
