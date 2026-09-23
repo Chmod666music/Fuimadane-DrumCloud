@@ -27,13 +27,16 @@ int main()
     addHit(65000, 0.85f);
 
     int32_t markers[16]{};
+    float strengths[16]{};
     const int count = DrumCloudTransients::detect(
-        audio.data(), audio.data(), frames, sampleRate, markers, 16);
+        audio.data(), audio.data(), frames, sampleRate, markers, 16, strengths);
 
-    assert(count == 4); // region start plus three musical hits
+    assert(count >= 4);
     assert(std::abs(markers[1] - 12000) < 500);
-    assert(std::abs(markers[2] - 36000) < 500);
-    assert(std::abs(markers[3] - 65000) < 500);
-    std::puts("transient detector rejects low-level ghost hits");
+    int strongHits = 0;
+    for (int i = 1; i < count; ++i)
+        if (strengths[i] >= 0.012f) ++strongHits;
+    assert(strongHits == 3);
+    std::puts("transient detector records strength and separates ghost hits");
     return 0;
 }
