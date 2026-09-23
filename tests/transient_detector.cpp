@@ -33,6 +33,7 @@ int main()
 
     assert(count >= 4);
     assert(std::abs(markers[1] - 12000) < 500);
+    assert(markers[1] <= 12050); // refine to the attack edge, not inside its peak
     int strongHits = 0;
     for (int i = 1; i < count; ++i)
         if (strengths[i] >= 0.012f) ++strongHits;
