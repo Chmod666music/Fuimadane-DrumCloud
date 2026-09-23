@@ -40,5 +40,8 @@ enum DrumCloudParams
     paramDelayDamping,
     paramTimeStretch,
     paramPlaybackMode,
+    // Slicer additions: append only to preserve every earlier parameter ID.
+    paramSliceMode,
+    paramSliceCount,
     paramCount
 };
