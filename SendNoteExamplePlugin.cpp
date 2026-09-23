@@ -141,6 +141,9 @@ static constexpr uint32_t kUiGrainMarkerCount = 16;
 std::atomic<uint32_t> gDrumCloudUiGrainCount{0};
 std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
 std::atomic<int> gDrumCloudUiActiveSlice{-1};
+static constexpr uint32_t kUiSliceBoundaryCount = 17;
+std::atomic<uint32_t> gDrumCloudUiSliceBoundaryCount{0};
+std::atomic<float> gDrumCloudUiSliceBoundaries[kUiSliceBoundaryCount];
 std::atomic<uint32_t> gDrumCloudDetectedPitchGeneration{0};
 std::atomic<int> gDrumCloudDetectedRoot{-1};
 std::atomic<float> gDrumCloudDetectedFine{0.0f};
@@ -461,22 +464,27 @@ public:
     {
         float start = fSampleStartNorm;
         float end = fSampleEndNorm;
-        if (fSliceMode && fActiveSlice >= 0)
+        if (fSliceMode != 0 && fActiveSlice >= 0)
         {
-            const float width = (fSampleEndNorm - fSampleStartNorm) / float(fSliceCount);
-            start += width * float(fActiveSlice);
-            end = start + width;
+            int32_t frameStart = 0;
+            int32_t frameEnd = 0;
+            if (getVoiceRegionFrames(DrumCloudSlicer::kBaseMidiNote + fActiveSlice,
+                                     frameStart, frameEnd) && sampleLen > 1)
+            {
+                start = float(frameStart) / float(sampleLen - 1);
+                end = float(frameEnd) / float(sampleLen - 1);
+            }
         }
         return start + fScanPos * (end - start);
     } // absolute 0..1 sample position
 
-    bool getSliceMode() const noexcept { return fSliceMode; }
+    int getSliceMode() const noexcept { return fSliceMode; }
     int getSliceCount() const noexcept { return fSliceCount; }
     int getActiveSlice() const noexcept { return fActiveSlice; }
     void setSliceMode(float value) noexcept
     {
-        fSliceMode = value >= 0.5f;
-        if (!fSliceMode) fActiveSlice = -1;
+        fSliceMode = std::clamp(int(std::lround(value)), 0, 2);
+        if (fSliceMode == 0) fActiveSlice = -1;
         resetActiveVoicePlayback();
     }
     void setSliceCount(float value) noexcept
@@ -517,6 +525,7 @@ public:
         int length = 0;
         int32_t markers[64]{};
         int markerCount = 0;
+        int transientMarkerCount = 0;
         float waveMin[1024]{};
         float waveMax[1024]{};
         PitchDetectionResult pitch;
@@ -533,6 +542,7 @@ public:
         prepared->sampleRate = scratch->sampleSR;
         prepared->length = scratch->sampleLen;
         prepared->markerCount = scratch->markerCount;
+        prepared->transientMarkerCount = scratch->transientMarkerCount;
         std::memcpy(prepared->markers, scratch->markers, sizeof(prepared->markers));
         std::memcpy(prepared->waveMin, scratch->waveMin, sizeof(prepared->waveMin));
         std::memcpy(prepared->waveMax, scratch->waveMax, sizeof(prepared->waveMax));
@@ -554,6 +564,7 @@ public:
         sampleLen = prepared.length;
         sampleSR = prepared.sampleRate;
         markerCount = prepared.markerCount;
+        transientMarkerCount = prepared.transientMarkerCount;
         std::memcpy(markers, prepared.markers, sizeof(markers));
         std::memcpy(waveMin, prepared.waveMin, sizeof(waveMin));
         std::memcpy(waveMax, prepared.waveMax, sizeof(waveMax));
@@ -874,10 +885,10 @@ void trigger(int note, int vel)
 {
     const uint8_t midiNote = uint8_t(note & 0x7F);
     const uint8_t velocity = uint8_t(vel & 0x7F);
-    if (fSliceMode)
+    if (fSliceMode != 0)
     {
-        const int slice = DrumCloudSlicer::sliceForMidiNote(int(midiNote), fSliceCount);
-        if (slice < 0)
+        const int slice = int(midiNote) - DrumCloudSlicer::kBaseMidiNote;
+        if (slice < 0 || slice >= getEffectiveSliceCount())
             return;
         fActiveSlice = slice;
     }
@@ -1213,16 +1224,58 @@ int32_t getRegionEndFrame() const noexcept
     return std::clamp<int32_t>(int32_t(std::ceil(fSampleEndNorm * float(sampleLen - 1))), 0, sampleLen - 1);
 }
 
-void getVoiceRegionFrames(int note, int32_t& start, int32_t& end) const noexcept
+int getEffectiveSliceCount() const noexcept
+{
+    if (fSliceMode == 0) return 0;
+    if (fSliceMode == 1) return fSliceCount;
+    return DrumCloudSlicer::transientSliceCount(getRegionStartFrame(), getRegionEndFrame(),
+                                                markers, transientMarkerCount, fSliceCount);
+}
+
+bool getVoiceRegionFrames(int note, int32_t& start, int32_t& end) const noexcept
 {
     start = getRegionStartFrame();
     end = getRegionEndFrame();
-    const int slice = DrumCloudSlicer::sliceForMidiNote(note, fSliceCount);
-    if (!fSliceMode || slice < 0)
-        return;
-    DrumCloudSlicer::frameRange(start, end, slice, fSliceCount, start, end);
+    if (fSliceMode == 0) return true;
+    const int slice = note - DrumCloudSlicer::kBaseMidiNote;
+    if (slice < 0) return false;
+    if (fSliceMode == 1)
+    {
+        if (slice >= fSliceCount) return false;
+        DrumCloudSlicer::frameRange(start, end, slice, fSliceCount, start, end);
+        return true;
+    }
+    return DrumCloudSlicer::transientFrameRange(start, end, markers, transientMarkerCount,
+                                                slice, fSliceCount, start, end);
 }
 
+public:
+uint32_t copySliceBoundaries(float* dst, uint32_t capacity) const noexcept
+{
+    if (dst == nullptr || capacity < 2 || sampleLen <= 1 || fSliceMode == 0) return 0;
+    int32_t frames[DrumCloudSlicer::kMaxSliceCount + 1]{};
+    int count = 0;
+    if (fSliceMode == 1)
+    {
+        count = std::min<int>(fSliceCount + 1, int(capacity));
+        const int32_t start = getRegionStartFrame();
+        const int32_t end = getRegionEndFrame();
+        const int32_t length = end - start + 1;
+        for (int i = 0; i < count; ++i)
+            frames[i] = start + int32_t((int64_t(length) * i) / fSliceCount);
+    }
+    else
+    {
+        count = DrumCloudSlicer::buildTransientBoundaries(
+            getRegionStartFrame(), getRegionEndFrame(), markers, transientMarkerCount,
+            fSliceCount, frames, std::min<int>(int(capacity), DrumCloudSlicer::kMaxSliceCount + 1));
+    }
+    for (int i = 0; i < count; ++i)
+        dst[i] = std::clamp(float(frames[i]) / float(sampleLen - 1), 0.0f, 1.0f);
+    return uint32_t(std::max(0, count));
+}
+
+private:
 inline float computeStartNorm(int note, uint32_t& rng) const
 {
     float base = fStartPosNorm;
@@ -1569,6 +1622,7 @@ void swapRemove(int idx)
 void makeMarkersFromSample()
 {
     markerCount = 0;
+    transientMarkerCount = 0;
     if (sampleLen <= 0) return;
 
     const float srMark = (sampleSR > 0) ? float(sampleSR) : sr;
@@ -1587,7 +1641,10 @@ void makeMarkersFromSample()
 
     // ✅ Always reserve marker 0 first (if room)
     if (markerCount < kMaxMarkers)
+    {
         markers[markerCount++] = 0;
+        lastMarker = 0;
+    }
 
     for (int32_t i = 0; i < sampleLen; ++i)
     {
@@ -1622,6 +1679,9 @@ void makeMarkersFromSample()
             }
         }
     }
+
+    // Preserve the real analysis result before adding snap-only fallback markers.
+    transientMarkerCount = markerCount;
 
     // ✅ If we only have the forced "0" marker, add fallback grid markers.
     // (Your old code triggers when markerCount==0; now it's at least 1.)
@@ -1731,7 +1791,7 @@ if (sampleLen > 0)
     // Base and spread are relative to the selected sample region.
     int32_t regionStart = 0;
     int32_t regionEnd = 0;
-    getVoiceRegionFrames(note, regionStart, regionEnd);
+    if (!getVoiceRegionFrames(note, regionStart, regionEnd)) return;
     const int32_t regionLength = std::max<int32_t>(1, regionEnd - regionStart + 1);
     const float startNorm = computeStartNorm(note, rng); // 0..1 inside region
     const float base = float(regionStart) + startNorm * float(regionLength - 1);
@@ -1788,7 +1848,7 @@ else
     if (densityMul >= 0.95f)
         g.amp *= 1.18f;
 
-    const float noteSemitones = fSliceMode
+    const float noteSemitones = fSliceMode != 0
         ? fSampleFineTuneCents / 100.0f
         : (float(note) - fRootNote) + fSampleFineTuneCents / 100.0f;
     const float sampleRateRatio = (sampleSR > 0 && sr > 0.0f)
@@ -1796,7 +1856,7 @@ else
         : 1.0f;
     g.step = fPitchRateParam * std::pow(2.0f, noteSemitones / 12.0f) * sampleRateRatio;
 
-    const float semis  = fSliceMode ? 0.0f : (frand01(rng) - 0.5f) * 1.0f;
+    const float semis  = fSliceMode != 0 ? 0.0f : (frand01(rng) - 0.5f) * 1.0f;
     const float detune = std::pow(2.0f, semis / 12.0f);
     g.step *= detune;
 
@@ -1917,7 +1977,7 @@ private:
     bool fVoicePlaybackFinished[128]{};
     uint8_t fUiVoiceNote = 0;
     int fPlaybackMode = kPlaybackLoop;
-    bool fSliceMode = false;
+    int fSliceMode = 0;
     int fSliceCount = 8;
     int fActiveSlice = -1;
 
@@ -1963,6 +2023,7 @@ private:
     static constexpr int kMaxMarkers = 64;
     int32_t markers[kMaxMarkers]{};
     int markerCount = 0;
+    int transientMarkerCount = 0;
 
     Grain grains[kMaxGrains]{};
     int   activeIdx[kMaxGrains]{};
@@ -2237,7 +2298,7 @@ float getParameterValue(uint32_t index) const override
     if (index == paramDelayDamping) return fDelayDamping;
     if (index == paramTimeStretch) return fGran.getTimeStretchRatio();
     if (index == paramPlaybackMode) return fGran.getPlaybackMode();
-    if (index == paramSliceMode) return fGran.getSliceMode() ? 1.0f : 0.0f;
+    if (index == paramSliceMode) return float(fGran.getSliceMode());
     if (index == paramSliceCount) return float(fGran.getSliceCount());
 
     return 0.0f;
@@ -2756,7 +2817,9 @@ void initParameter(uint32_t index, Parameter& parameter) override
     case paramSliceMode:
         parameter.name   = "Slicer Mode";
         parameter.symbol = "slice_mode";
-        parameter.hints  = kParameterIsAutomatable | kParameterIsBoolean | kParameterIsInteger;
+        parameter.hints  = kParameterIsAutomatable | kParameterIsInteger;
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 2.0f;
         parameter.ranges.def = 0.0f;
         break;
 
@@ -2945,6 +3008,12 @@ void initParameter(uint32_t index, Parameter& parameter) override
         gDrumCloudUiGrainPos[i].store(grainPositions[i], std::memory_order_relaxed);
     gDrumCloudUiGrainCount.store(grainCount, std::memory_order_release);
     gDrumCloudUiActiveSlice.store(fGran.getActiveSlice(), std::memory_order_relaxed);
+    float sliceBoundaries[kUiSliceBoundaryCount]{};
+    const uint32_t sliceBoundaryCount = fGran.copySliceBoundaries(
+        sliceBoundaries, kUiSliceBoundaryCount);
+    for (uint32_t i = 0; i < sliceBoundaryCount; ++i)
+        gDrumCloudUiSliceBoundaries[i].store(sliceBoundaries[i], std::memory_order_relaxed);
+    gDrumCloudUiSliceBoundaryCount.store(sliceBoundaryCount, std::memory_order_release);
 
     if (fScanMeterCountdown == 0)
     {
