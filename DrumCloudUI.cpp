@@ -85,6 +85,7 @@ extern std::atomic<int>   gDrumCloudUiScanMode;
 static constexpr uint32_t kUiGrainMarkerCount = 16;
 extern std::atomic<uint32_t> gDrumCloudUiGrainCount;
 extern std::atomic<float> gDrumCloudUiGrainPos[kUiGrainMarkerCount];
+extern std::atomic<int> gDrumCloudUiActiveSlice;
 extern std::atomic<uint32_t> gDrumCloudDetectedPitchGeneration;
 extern std::atomic<int> gDrumCloudDetectedRoot;
 extern std::atomic<float> gDrumCloudDetectedFine;
@@ -178,6 +179,9 @@ private:
     float fScanPosUI = 0.0f;
     int   fScanModeUi = 0;
     int   fPlaybackModeUi = 0;
+    int   fSliceModeUi = 0;
+    int   fSliceCountUi = 8;
+    int   fActiveSliceUi = -1;
     float fGrainPosUI[kUiGrainMarkerCount]{};
     uint32_t fGrainCountUI = 0;
     
@@ -833,6 +837,32 @@ void DrumCloudUI::onDisplay()
         const float regionStartX = x0 + std::clamp(fSampleStartUi, 0.0f, 1.0f) * (x1 - x0);
         const float regionEndX = x0 + std::clamp(fSampleEndUi, 0.0f, 1.0f) * (x1 - x0);
 
+        if (fSliceModeUi != 0 && fSliceCountUi >= 2)
+        {
+            const float sliceWidth = (regionEndX - regionStartX) / float(fSliceCountUi);
+            if (fActiveSliceUi >= 0 && fActiveSliceUi < fSliceCountUi)
+            {
+                const float activeX0 = regionStartX + sliceWidth * float(fActiveSliceUi);
+                const float activeX1 = activeX0 + sliceWidth;
+                glColor4f(0.95f, 0.62f, 0.16f, 0.12f);
+                glBegin(GL_QUADS);
+                    glVertex2f(activeX0, y0); glVertex2f(activeX1, y0);
+                    glVertex2f(activeX1, y1); glVertex2f(activeX0, y1);
+                glEnd();
+            }
+
+            glLineWidth(1.0f);
+            glColor4f(0.72f, 0.58f, 0.31f, 0.58f);
+            glBegin(GL_LINES);
+            for (int slice = 1; slice < fSliceCountUi; ++slice)
+            {
+                const float x = regionStartX + sliceWidth * float(slice);
+                glVertex2f(x, y0 + 3.0f);
+                glVertex2f(x, y1 - 3.0f);
+            }
+            glEnd();
+        }
+
         // Dim audio outside the playable region and draw draggable gold handles.
         glColor4f(0.015f, 0.012f, 0.010f, 0.72f);
         glBegin(GL_QUADS);
@@ -940,7 +970,7 @@ void DrumCloudUI::onDisplay()
     {
         const float bx0 = 18.0f;
         const float by0 = 52.0f;
-        const float bw = 120.0f;
+        const float bw = 110.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -956,7 +986,7 @@ void DrumCloudUI::onDisplay()
         glEnd();
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(fAutoRootUi >= 0.5f ? "AUTO ROOT ON" : "AUTO ROOT OFF",
-                      bx0 + 9.0f, by0 + 6.0f, 1.15f);
+                      bx0 + 7.0f, by0 + 6.0f, 1.05f);
     }
 
     {
@@ -968,9 +998,9 @@ void DrumCloudUI::onDisplay()
         else
             std::snprintf(pitchBuf, sizeof(pitchBuf), "ROOT LOW CONF");
 
-        const float bx0 = 146.0f;
+        const float bx0 = 136.0f;
         const float by0 = 52.0f;
-        const float bw = 120.0f;
+        const float bw = 110.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -992,7 +1022,7 @@ void DrumCloudUI::onDisplay()
     {
         char scanBuf[24];
         std::snprintf(scanBuf, sizeof(scanBuf), "SCAN %.2f", fScanPosUI);
-        const float bx0 = 372.0f;
+        const float bx0 = 342.0f;
         const float by0 = 52.0f;
         const float bw = 90.0f;
         const float bh = 22.0f;
@@ -1021,9 +1051,9 @@ void DrumCloudUI::onDisplay()
         }
         char modeBuf[20];
         std::snprintf(modeBuf, sizeof(modeBuf), "%s %d", modeName, fScanModeUi);
-        const float bx0 = 274.0f;
+        const float bx0 = 254.0f;
         const float by0 = 52.0f;
-        const float bw = 90.0f;
+        const float bw = 80.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.92f);
         glBegin(GL_QUADS);
@@ -1049,9 +1079,9 @@ void DrumCloudUI::onDisplay()
         default: break;
         }
 
-        const float bx0 = 470.0f;
+        const float bx0 = 440.0f;
         const float by0 = 52.0f;
-        const float bw = 332.0f;
+        const float bw = 150.0f;
         const float bh = 22.0f;
         glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
         glBegin(GL_QUADS);
@@ -1065,6 +1095,41 @@ void DrumCloudUI::onDisplay()
         glEnd();
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(playbackName, bx0 + 9.0f, by0 + 6.0f, 1.15f);
+    }
+
+    {
+        const float bx0 = 598.0f, by0 = 52.0f, bw = 92.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(fSliceModeUi ? 0.96f : 0.30f, fSliceModeUi ? 0.68f : 0.34f,
+                  fSliceModeUi ? 0.18f : 0.44f, 0.95f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(fSliceModeUi ? "SLICE ON" : "SLICE OFF", bx0 + 8.0f, by0 + 6.0f, 1.05f);
+    }
+
+    {
+        char sliceBuf[24];
+        std::snprintf(sliceBuf, sizeof(sliceBuf), "%d @ MIDI36", fSliceCountUi);
+        const float bx0 = 698.0f, by0 = 52.0f, bw = 104.0f, bh = 22.0f;
+        glColor4f(0.10f, 0.11f, 0.15f, 0.94f);
+        glBegin(GL_QUADS);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.30f, 0.34f, 0.44f, 0.9f);
+        glBegin(GL_LINE_LOOP);
+            glVertex2f(bx0, by0); glVertex2f(bx0 + bw, by0);
+            glVertex2f(bx0 + bw, by0 + bh); glVertex2f(bx0, by0 + bh);
+        glEnd();
+        glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
+        drawPixelText(sliceBuf, bx0 + 7.0f, by0 + 6.0f, 0.92f);
     }
 
     glMatrixMode(GL_MODELVIEW);
@@ -1185,6 +1250,12 @@ void DrumCloudUI::uiIdle()
         repaint();
     }
     const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
+    const int activeSlice = gDrumCloudUiActiveSlice.load(std::memory_order_relaxed);
+    if (activeSlice != fActiveSliceUi)
+    {
+        fActiveSliceUi = activeSlice;
+        repaint();
+    }
 
     const uint32_t detectedGeneration =
         gDrumCloudDetectedPitchGeneration.load(std::memory_order_acquire);
@@ -1255,7 +1326,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     {
         const float autoBx0 = 18.0f;
         const float autoBy0 = 52.0f;
-        const float autoBw = 120.0f;
+        const float autoBw = 110.0f;
         const float autoBh = 22.0f;
         if (mx >= autoBx0 && mx <= autoBx0 + autoBw &&
             my >= autoBy0 && my <= autoBy0 + autoBh)
@@ -1276,9 +1347,9 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float playbackBx0 = 470.0f;
+        const float playbackBx0 = 440.0f;
         const float playbackBy0 = 52.0f;
-        const float playbackBw = 332.0f;
+        const float playbackBw = 150.0f;
         const float playbackBh = 22.0f;
         if (mx >= playbackBx0 && mx <= playbackBx0 + playbackBw &&
             my >= playbackBy0 && my <= playbackBy0 + playbackBh)
@@ -1302,9 +1373,29 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float modeBx0 = 274.0f;
+        if (mx >= 598.0f && mx <= 690.0f && my >= 52.0f && my <= 74.0f)
+        {
+            fSliceModeUi = fSliceModeUi ? 0 : 1;
+            editParameter(paramSliceMode, true);
+            setParameterValue(paramSliceMode, float(fSliceModeUi));
+            editParameter(paramSliceMode, false);
+            repaint();
+            return true;
+        }
+
+        if (mx >= 698.0f && mx <= 802.0f && my >= 52.0f && my <= 74.0f)
+        {
+            fSliceCountUi = (fSliceCountUi < 4) ? 4 : (fSliceCountUi < 8) ? 8 : (fSliceCountUi < 16) ? 16 : 2;
+            editParameter(paramSliceCount, true);
+            setParameterValue(paramSliceCount, float(fSliceCountUi));
+            editParameter(paramSliceCount, false);
+            repaint();
+            return true;
+        }
+
+        const float modeBx0 = 254.0f;
         const float modeBy0 = 52.0f;
-        const float modeBw  = 90.0f;
+        const float modeBw  = 80.0f;
         const float modeBh  = 22.0f;
 
         if (mx >= modeBx0 && mx <= modeBx0 + modeBw &&
@@ -1477,6 +1568,8 @@ void DrumCloudUI::parameterChanged(uint32_t index, float value)
     if (index == paramDelayDamping) { fDelayDampingUi = value; repaint(); return; }
     if (index == paramTimeStretch) { fTimeStretchUi = value; repaint(); return; }
     if (index == paramPlaybackMode) { fPlaybackModeUi = (int)std::lround(value); repaint(); return; }
+    if (index == paramSliceMode) { fSliceModeUi = value >= 0.5f ? 1 : 0; repaint(); return; }
+    if (index == paramSliceCount) { fSliceCountUi = std::clamp((int)std::lround(value), 2, 16); repaint(); return; }
     if (index == paramScanMode) { fScanModeUi = (int)std::lround(value); repaint(); return; }
     if (index == paramScanPos) { repaint(); return; }
 }
