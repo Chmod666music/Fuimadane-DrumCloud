@@ -1674,8 +1674,44 @@ void makeMarkersFromSample()
     if (sampleLen <= 0) return;
 
     const float srMark = (sampleSR > 0) ? float(sampleSR) : sr;
+    // Reserve one slot for the sample-end boundary. Keep every transient's
+    // position and strength paired while sorting/compacting: selecting a
+    // position with another transient's strength produces visibly wrong
+    // slice boundaries.
     markerCount = DrumCloudTransients::detect(sampleL.data(), sampleR.data(), sampleLen,
-                                               srMark, markers, kMaxMarkers, markerStrengths);
+                                               srMark, markers, kMaxMarkers - 1, markerStrengths);
+
+    for (int i = 1; i < markerCount; ++i)
+    {
+        const int32_t marker = markers[i];
+        const float strength = markerStrengths[i];
+        int j = i;
+        while (j > 0 && markers[j - 1] > marker)
+        {
+            markers[j] = markers[j - 1];
+            markerStrengths[j] = markerStrengths[j - 1];
+            --j;
+        }
+        markers[j] = marker;
+        markerStrengths[j] = strength;
+    }
+
+    if (markerCount > 1)
+    {
+        int w = 1;
+        for (int r = 1; r < markerCount; ++r)
+        {
+            if (markers[r] == markers[w - 1])
+            {
+                markerStrengths[w - 1] = std::max(markerStrengths[w - 1], markerStrengths[r]);
+                continue;
+            }
+            markers[w] = markers[r];
+            markerStrengths[w] = markerStrengths[r];
+            ++w;
+        }
+        markerCount = w;
+    }
     transientMarkerCount = markerCount;
 
     // ✅ If we only have the forced "0" marker, add fallback grid markers.
@@ -1687,37 +1723,10 @@ void makeMarkersFromSample()
             markers[markerCount++] = p;
     }
 
-    if (markerCount > 1)
-        std::sort(markers, markers + markerCount);
-
     // ✅ Ensure last marker exists (sampleLen-1) and avoid duplicate
     const int32_t last = sampleLen - 1;
-    if (markerCount < kMaxMarkers)
-    {
-        if (markerCount == 0 || markers[markerCount - 1] != last)
-            markers[markerCount++] = last;
-    }
-    else
-    {
-        // If full, at least force the last slot to be the end
-        markers[markerCount - 1] = last;
-    }
-
-    // ✅ Re-sort after appending last
-    if (markerCount > 1)
-        std::sort(markers, markers + markerCount);
-
-    // ✅ Optional: compact duplicates after sort (super-safe)
-    if (markerCount > 1)
-    {
-        int w = 1;
-        for (int r = 1; r < markerCount; ++r)
-        {
-            if (markers[r] != markers[w - 1])
-                markers[w++] = markers[r];
-        }
-        markerCount = w;
-    }
+    if (markerCount == 0 || markers[markerCount - 1] != last)
+        markers[markerCount++] = last;
 
 #ifdef DRUMCLOUD_DEBUG
     DCLOG("[markers] count=%d first=%d last=%d\n",
