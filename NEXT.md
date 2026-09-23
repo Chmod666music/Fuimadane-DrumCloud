@@ -25,6 +25,7 @@ Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggerin
 - Slice voices retain DrumCloud's granular density, envelopes, filter, reverb, delay, scan and playback modes, but play at the sample's original pitch instead of transposing each slice by its trigger key.
 - Slice bounds are stored per grain so overlapping/polyphonic slices cannot move one another's playback region.
 - The waveform shows every boundary and highlights the last triggered slice. Slicer mode defaults to off, preserving old sessions and the normal chromatic instrument mode.
+- `SLICE TR` reuses the transient analysis performed during sample loading. Real detected onsets become slice starts; fallback snap-grid markers are deliberately excluded. The selected count acts as a maximum, and the UI reports detected/maximum slices.
 
 ## DrumCloud JS feature reference
 
