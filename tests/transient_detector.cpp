@@ -37,6 +37,23 @@ int main()
     for (int i = 1; i < count; ++i)
         if (strengths[i] >= 0.012f) ++strongHits;
     assert(strongHits == 3);
+
+    // More candidates than capacity must still scan the complete sample.
+    std::vector<float> dense(48000 * 12, 0.0f);
+    for (int hit = 1; hit < 110; ++hit)
+    {
+        const int start = hit * 5000;
+        if (start + 100 >= int(dense.size())) break;
+        for (int i = 0; i < 100; ++i)
+            dense[start + i] = 0.8f * std::exp(-float(i) / 18.0f);
+    }
+    int32_t limitedMarkers[16]{};
+    float limitedStrengths[16]{};
+    const int limitedCount = DrumCloudTransients::detect(
+        dense.data(), dense.data(), int32_t(dense.size()), sampleRate,
+        limitedMarkers, 16, limitedStrengths);
+    assert(limitedCount == 16);
+    assert(limitedMarkers[limitedCount - 1] > int32_t(dense.size() * 0.80f));
     std::puts("transient detector records strength and separates ghost hits");
     return 0;
 }
