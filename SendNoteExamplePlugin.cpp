@@ -23,6 +23,7 @@
 #include "PolyphonicNoteState.hpp"
 #include "GranularTimeStretch.hpp"
 #include "SliceMapping.hpp"
+#include "TransientDetector.hpp"
 
 // 👇 SÆT FILTER-KLASSEN IND HER 👇
 struct SvfStereo {
@@ -1626,61 +1627,8 @@ void makeMarkersFromSample()
     if (sampleLen <= 0) return;
 
     const float srMark = (sampleSR > 0) ? float(sampleSR) : sr;
-
-    const float a = 0.01f;
-    float envPrev = 0.0f;
-    float env = 0.0f;
-
-    const int32_t minDist = int32_t(srMark * 0.030f);
-    int32_t lastMarker = -minDist;
-
-    float avg = 0.0f;
-    const float avgA = 0.0015f;
-
-    float currOn = 0.0f;
-
-    // ✅ Always reserve marker 0 first (if room)
-    if (markerCount < kMaxMarkers)
-    {
-        markers[markerCount++] = 0;
-        lastMarker = 0;
-    }
-
-    for (int32_t i = 0; i < sampleLen; ++i)
-    {
-        const float m = 0.5f * (sampleL[i] + sampleR[i]);
-        const float absM = std::fabs(m);
-
-        env += a * (absM - env);
-
-        const float d = env - envPrev;
-        envPrev = env;
-
-        const float on = (d > 0.0f) ? d : 0.0f;
-
-        avg += avgA * (on - avg);
-        currOn = on;
-
-        if (i < 2) continue;
-
-        const float thr = avg * 6.0f;
-
-        if (currOn > thr && (i - lastMarker) >= minDist)
-        {
-            if (markerCount < kMaxMarkers)
-            {
-                // ✅ Avoid duplicate 0 (and other duplicates later) cheaply:
-                // only add if not same as previous stored marker
-                if (markers[markerCount - 1] != i)
-                {
-                    markers[markerCount++] = i;
-                    lastMarker = i;
-                }
-            }
-        }
-    }
-
-    // Preserve the real analysis result before adding snap-only fallback markers.
+    markerCount = DrumCloudTransients::detect(sampleL.data(), sampleR.data(), sampleLen,
+                                               srMark, markers, kMaxMarkers);
     transientMarkerCount = markerCount;
 
     // ✅ If we only have the forced "0" marker, add fallback grid markers.
