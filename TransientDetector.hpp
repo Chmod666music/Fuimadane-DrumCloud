@@ -33,7 +33,7 @@ inline int detect(const float* left, const float* right, int32_t frames,
     float slowEnvelope = 0.0f;
     float averageNovelty = 0.0f;
 
-    for (int32_t i = 0; i < frames && count < capacity; ++i)
+    for (int32_t i = 0; i < frames; ++i)
     {
         const float mono = right != nullptr ? 0.5f * (left[i] + right[i]) : left[i];
         const float magnitude = std::fabs(mono);
@@ -48,15 +48,46 @@ inline int detect(const float* left, const float* right, int32_t frames,
         if (prominent && novelty > std::max(adaptiveThreshold, absoluteThreshold) &&
             i - lastMarker >= minimumDistance)
         {
-            markers[count] = i;
-            if (strengths != nullptr)
-                strengths[count] = std::clamp(novelty / peak, 0.0f, 1.0f);
-            ++count;
+            const float strength = std::clamp(novelty / peak, 0.0f, 1.0f);
+            int slot = -1;
+            if (count < capacity)
+            {
+                slot = count++;
+            }
+            else if (capacity > 1 && strengths != nullptr)
+            {
+                int weakest = 1; // marker zero is the fixed region anchor
+                for (int candidate = 2; candidate < count; ++candidate)
+                    if (strengths[candidate] < strengths[weakest]) weakest = candidate;
+                if (strength >= strengths[weakest]) slot = weakest;
+            }
+
+            if (slot >= 0)
+            {
+                markers[slot] = i;
+                if (strengths != nullptr) strengths[slot] = strength;
+            }
             lastMarker = i;
 
             // Suppress the same hit's immediate ringing without hiding the next beat.
             fastEnvelope = slowEnvelope;
         }
+    }
+
+    // Replacement above is strength-based; restore chronological playback order.
+    for (int i = 2; i < count; ++i)
+    {
+        const int32_t marker = markers[i];
+        const float strength = strengths != nullptr ? strengths[i] : 0.0f;
+        int j = i;
+        while (j > 1 && markers[j - 1] > marker)
+        {
+            markers[j] = markers[j - 1];
+            if (strengths != nullptr) strengths[j] = strengths[j - 1];
+            --j;
+        }
+        markers[j] = marker;
+        if (strengths != nullptr) strengths[j] = strength;
     }
 
     return count;
