@@ -17,6 +17,15 @@ The `PLAY MODE` control is implemented for the main sample/scanner playhead betw
 
 Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggering and continuing from the current position.
 
+## In development: MIDI slicer
+
+- `SLICE ON` divides the current Sample Start/End region into equal, non-overlapping slices.
+- Choose 2, 4, 8 or 16 slices from the UI; the automatable parameter itself accepts every integer from 2–16.
+- MIDI note 36 triggers slice 1 and consecutive notes trigger consecutive slices.
+- Slice voices retain DrumCloud's granular density, envelopes, filter, reverb, delay, scan and playback modes, but play at the sample's original pitch instead of transposing each slice by its trigger key.
+- Slice bounds are stored per grain so overlapping/polyphonic slices cannot move one another's playback region.
+- The waveform shows every boundary and highlights the last triggered slice. Slicer mode defaults to off, preserving old sessions and the normal chromatic instrument mode.
+
 ## DrumCloud JS feature reference
 
 The current file in [DrumCloud-ReaPack](https://github.com/Chmod666music/DrumCloud-ReaPack/blob/main/Effects/DrumCloud/DrumCloud_JS.jsfx) declares v0.27. Its source exposes sample start/end, five position modes, per-grain direction, pitch/density/stereo spread, grain attack/release, eight MIDI voices, automatic/manual root handling, delay, and room/hall/shimmer reverb.
