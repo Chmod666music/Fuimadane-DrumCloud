@@ -17,7 +17,7 @@ The `PLAY MODE` control is implemented for the main sample/scanner playhead betw
 
 Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggering and continuing from the current position.
 
-## In development: MIDI slicer
+## Completed for v1.9.0-beta.3: MIDI slicer and scalable UI
 
 - `SLICE ON` divides the current Sample Start/End region into equal, non-overlapping slices.
 - Choose 2, 4, 8 or 16 slices from the UI; the automatable parameter itself accepts every integer from 2–16.
