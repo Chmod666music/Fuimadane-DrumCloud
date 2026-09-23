@@ -79,7 +79,7 @@ int main()
     for (int i = 1; i < variedCount; ++i)
     {
         if (std::abs(variedMarkers[i] - 8000) < 1000) quietIndex = i;
-        if (std::abs(variedMarkers[i] - 24000) < 1000) loudIndex = i;
+        if (std::abs(variedMarkers[i] - 24000) < 500) loudIndex = i;
     }
     assert(quietIndex >= 0 && loudIndex >= 0);
     assert(variedStrengths[loudIndex] > variedStrengths[quietIndex] * 2.0f);
