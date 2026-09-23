@@ -1,26 +1,26 @@
-# DrumCloud v1.9.0-beta.3
+# DrumCloud v1.9.0-beta.4
 
-This milestone turns DrumCloud into a compact granular slicer instrument while
-making its dark-and-gold interface easier to use across different displays.
+This hotfix supersedes beta.3. It keeps the complete scalable-UI and MIDI-slicer
+milestone while restoring a faster, more familiar sample-loading workflow.
 
-## New in beta.3
+## Fixed in beta.4
 
-- **SLICE EQ** divides the selected Sample Start/End region into 2–16 equal,
-  non-overlapping slices
-- **SLICE TR** detects real transient onsets throughout the complete sample
-- MIDI note 36 and upward trigger consecutive slices at the sample's original pitch
-- Polyphonic slice playback with independent, safe grain boundaries per voice
-- **SENS** changes transient sensitivity immediately without reloading the sample
-- Strongest suitably spaced attacks are selected across the region, preventing a
-  dense early cluster from consuming all available slices
-- Improved onset refinement places boundaries just before broad and low-frequency
-  attacks instead of inside their waveform peaks
-- Waveform slice boundaries and active-slice highlighting
-- Resizable, HiDPI-aware interface with correctly scaled drawing and pointer input
-- Playback and slicer controls moved above the waveform for a clearer overview
-- Compact gold Sample Start/End grab handles with wider hit areas, reducing
-  accidental sample-dialog openings
-- Slicer defaults to off, preserving the normal chromatic instrument workflow
+- The native sample browser remembers the last used folder across browser
+  closes, plugin instances, projects and application restarts
+- If a sample is already loaded, the browser opens in that sample's folder
+- A saved last folder is used when no sample is loaded, with Home as a safe
+  fallback
+- The existing asynchronous validation and sample-loading path remains intact
+
+## Included from beta.3
+
+- Equal and transient-detected MIDI slicing with 2–16 slices
+- Adjustable transient sensitivity and refined onset placement
+- MIDI note 36 and upward trigger consecutive slices at original sample pitch
+- Polyphonic slice playback with safe, independent grain boundaries
+- Waveform slice markers and active-slice highlighting
+- Resizable, HiDPI-aware interface with scaled drawing and pointer input
+- Clearer waveform layout plus easy-to-grab Sample Start/End handles
 
 ## Downloads
 
@@ -30,9 +30,10 @@ making its dark-and-gold interface easier to use across different displays.
 
 ## Validation status
 
-The Linux CLAP and VST3 builds passed the complete native regression suite and
-manual testing in REAPER. Automated Linux, Windows and macOS builds pass. The
-Windows and macOS packages remain beta builds that need testing in real hosts.
+Manual Linux CLAP and VST3 testing passed, including loading a sample, closing
+the chooser and reopening it in the remembered folder. Automated Linux, Windows
+and macOS builds pass. Windows and macOS packages remain beta builds that need
+testing in real hosts.
 
 ## Beta warning
 
