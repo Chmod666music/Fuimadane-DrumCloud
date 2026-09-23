@@ -40,6 +40,18 @@ int main()
     assert(start == 880 && end == 899);
     assert(!transientFrameRange(100, 899, transients, 5, 5, 8, start, end));
 
+    // A dense early cluster must not consume every available transient slice.
+    const int32_t clustered[] = { 100, 120, 140, 160, 400, 700, 900 };
+    const float strengths[] = { 0.5f, 0.9f, 0.8f, 0.7f, 0.6f, 1.0f, 0.55f };
+    int32_t selected[4]{};
+    const int selectedCount = selectStrongestSpacedMarkers(
+        0, 1000, clustered, strengths, 7, 4, 100, selected, 4);
+    assert(selectedCount == 4);
+    assert(selected[0] == 120);
+    assert(selected[1] == 400);
+    assert(selected[2] == 700);
+    assert(selected[3] == 900);
+
     std::puts("slicer MIDI mapping and frame boundaries passed");
     return 0;
 }
