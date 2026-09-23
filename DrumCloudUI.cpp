@@ -26,6 +26,11 @@
 
 namespace DISTRHO {
 
+static constexpr float kDrumCloudUiWidth = 820.0f;
+static constexpr float kDrumCloudUiHeight = 700.0f;
+static constexpr uint kDrumCloudUiMinWidth = 615;
+static constexpr uint kDrumCloudUiMinHeight = 525;
+
 struct DrumCloudKnobSpec
 {
     uint32_t param;
@@ -136,8 +141,13 @@ class DrumCloudUI : public UI
 {
 public:
     DrumCloudUI()
-        : UI(820, 700, true)
+        : UI(820, 700)
     {
+        // Keep a 4:3-ish fixed aspect ratio, but allow manual resizing down to 75%.
+        // Rendering and pointer input are scaled explicitly below because this UI
+        // uses raw OpenGL coordinates.
+        setGeometryConstraints(kDrumCloudUiMinWidth, kDrumCloudUiMinHeight,
+                               true, false, false);
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
@@ -743,7 +753,19 @@ void DrumCloudUI::previewLoop()
 
 void DrumCloudUI::onDisplay()
 {
-    const float W = (float)getWidth();
+    const float physicalWidth = std::max(1.0f, static_cast<float>(getWidth()));
+    const float physicalHeight = std::max(1.0f, static_cast<float>(getHeight()));
+    const float scaleX = physicalWidth / kDrumCloudUiWidth;
+    const float scaleY = physicalHeight / kDrumCloudUiHeight;
+    const float W = kDrumCloudUiWidth;
+
+    // Draw the complete interface in its original 820x700 coordinate system.
+    // The host window may be any proportional size; OpenGL scales every visual
+    // element, including knobs, text, waveform and hit-area markers together.
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    glScalef(scaleX, scaleY, 1.0f);
     const float waveTop = 52.0f;
     const float waveBottom = 176.0f;
     const float mid = 0.5f * (waveTop + waveBottom);
@@ -1044,15 +1066,20 @@ void DrumCloudUI::onDisplay()
         glColor4f(0.88f, 0.91f, 0.97f, 0.98f);
         drawPixelText(playbackName, bx0 + 9.0f, by0 + 6.0f, 1.15f);
     }
+
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
 }
 
 bool DrumCloudUI::onMotion(const MotionEvent& ev)
 {
-    const float mx = (float)ev.pos.getX();
-    const float my = (float)ev.pos.getY();
+    const float scaleX = std::max(1.0f, static_cast<float>(getWidth())) / kDrumCloudUiWidth;
+    const float scaleY = std::max(1.0f, static_cast<float>(getHeight())) / kDrumCloudUiHeight;
+    const float mx = static_cast<float>(ev.pos.getX()) / scaleX;
+    const float my = static_cast<float>(ev.pos.getY()) / scaleY;
 
     const float wx0 = 18.0f;
-    const float wx1 = (float)getWidth() - 18.0f;
+    const float wx1 = kDrumCloudUiWidth - 18.0f;
 
     if (fDragSampleStart)
     {
@@ -1209,10 +1236,12 @@ void DrumCloudUI::uiIdle()
 
 bool DrumCloudUI::onMouse(const MouseEvent& ev)
 {
-    const float mx = (float)ev.pos.getX();
-    const float my = (float)ev.pos.getY();
+    const float scaleX = std::max(1.0f, static_cast<float>(getWidth())) / kDrumCloudUiWidth;
+    const float scaleY = std::max(1.0f, static_cast<float>(getHeight())) / kDrumCloudUiHeight;
+    const float mx = static_cast<float>(ev.pos.getX()) / scaleX;
+    const float my = static_cast<float>(ev.pos.getY()) / scaleY;
     const float wx0 = 18.0f;
-    const float wx1 = (float)getWidth() - 18.0f;
+    const float wx1 = kDrumCloudUiWidth - 18.0f;
     const float wy0 = 52.0f;
     const float wy1 = 176.0f;
     const bool hitWave = (mx >= wx0 && mx <= wx1 && my >= wy0 && my <= wy1);
@@ -1224,7 +1253,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
     if (ev.button == 1 && ev.press)
     {
-        const float autoBx0 = (float)getWidth() - 258.0f;
+        const float autoBx0 = kDrumCloudUiWidth - 258.0f;
         const float autoBy0 = 60.0f;
         const float autoBw = 120.0f;
         const float autoBh = 22.0f;
@@ -1247,7 +1276,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float playbackBx0 = (float)getWidth() - 258.0f;
+        const float playbackBx0 = kDrumCloudUiWidth - 258.0f;
         const float playbackBy0 = 116.0f;
         const float playbackBw = 230.0f;
         const float playbackBh = 22.0f;
@@ -1273,7 +1302,7 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
             return true;
         }
 
-        const float modeBx0 = (float)getWidth() - 118.0f;
+        const float modeBx0 = kDrumCloudUiWidth - 118.0f;
         const float modeBy0 = 60.0f;
         const float modeBw  = 90.0f;
         const float modeBh  = 22.0f;
