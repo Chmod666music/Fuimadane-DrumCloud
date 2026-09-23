@@ -148,12 +148,12 @@ inline int detect(const float* left, const float* right, int32_t frames,
     }
 
     // Replacement above is strength-based; restore chronological playback order.
-    for (int i = 2; i < count; ++i)
+    for (int i = 1; i < count; ++i)
     {
         const int32_t marker = markers[i];
         const float strength = strengths != nullptr ? strengths[i] : 0.0f;
         int j = i;
-        while (j > 1 && markers[j - 1] > marker)
+        while (j > 0 && markers[j - 1] > marker)
         {
             markers[j] = markers[j - 1];
             if (strengths != nullptr) strengths[j] = strengths[j - 1];
