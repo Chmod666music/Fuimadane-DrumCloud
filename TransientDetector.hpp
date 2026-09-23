@@ -90,7 +90,26 @@ inline int detect(const float* left, const float* right, int32_t frames,
         if (prominent && novelty > std::max(adaptiveThreshold, absoluteThreshold) &&
             i - lastMarker >= minimumDistance)
         {
-            const float strength = std::clamp(novelty / peak, 0.0f, 1.0f);
+            // Novelty alone overvalues tiny, click-like attacks and can make a
+            // quiet tick outrank the main drum hit. Measure the event's actual
+            // peak around the threshold crossing as well. Peak level carries
+            // most of the musical-importance score, while novelty still helps
+            // distinguish a real new onset from a loud sustained tail.
+            const int32_t peakLookBehind = std::max<int32_t>(1, int32_t(sr * 0.010f));
+            const int32_t peakLookAhead = std::max<int32_t>(1, int32_t(sr * 0.080f));
+            const int32_t peakFirst = std::max<int32_t>(0, i - peakLookBehind);
+            const int32_t peakLast = std::min<int32_t>(frames, i + peakLookAhead);
+            float eventPeak = 0.0f;
+            for (int32_t peakFrame = peakFirst; peakFrame < peakLast; ++peakFrame)
+            {
+                const float peakMono = right != nullptr
+                    ? 0.5f * (left[peakFrame] + right[peakFrame])
+                    : left[peakFrame];
+                eventPeak = std::max(eventPeak, std::fabs(peakMono));
+            }
+            const float noveltyStrength = std::clamp(novelty / peak, 0.0f, 1.0f);
+            const float peakStrength = std::clamp(eventPeak / peak, 0.0f, 1.0f);
+            const float strength = 0.35f * noveltyStrength + 0.65f * peakStrength;
             const int32_t onset = refineOnset(left, right, i, frames, sr,
                                               fastEnvelope, peak);
             int slot = -1;
