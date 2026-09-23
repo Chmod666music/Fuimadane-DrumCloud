@@ -10,8 +10,11 @@ inline int32_t refineOnset(const float* left, const float* right, int32_t detect
                            int32_t frames, float sampleRate, float referenceLevel,
                            float globalPeak) noexcept
 {
-    const int32_t block = std::max<int32_t>(8, int32_t(sampleRate * 0.001f));
-    const int32_t search = std::max<int32_t>(block, int32_t(sampleRate * 0.035f));
+    // Multi-millisecond blocks do not mistake a low-frequency zero crossing
+    // inside a kick/bass transient for silence. The longer look-back also
+    // reaches the beginning of slower attacks.
+    const int32_t block = std::max<int32_t>(8, int32_t(sampleRate * 0.003f));
+    const int32_t search = std::max<int32_t>(block, int32_t(sampleRate * 0.100f));
     const int32_t first = std::max<int32_t>(0, detected - search);
     const float quietThreshold = std::max(globalPeak * 0.0002f, referenceLevel * 0.10f);
     int32_t quietEnd = -1;
@@ -40,7 +43,8 @@ inline int32_t refineOnset(const float* left, const float* right, int32_t detect
         }
     }
 
-    const int32_t onset = quietEnd >= 0 ? quietEnd : minimumEnd;
+    // One block of pre-roll avoids trimming the first cycle of the attack.
+    const int32_t onset = (quietEnd >= 0 ? quietEnd : minimumEnd) - block;
     return std::clamp<int32_t>(onset, 0, std::max<int32_t>(0, frames - 1));
 }
 
