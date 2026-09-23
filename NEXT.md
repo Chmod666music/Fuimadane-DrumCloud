@@ -30,6 +30,7 @@ Possible follow-up: `REVERSE ←` one-shot and a user choice between retriggerin
 - `SENS` filters the stored transient candidates immediately without reloading or reanalysing the sample. Higher values include softer details; lower values keep only stronger attacks.
 - Transient analysis scans the entire sample even when its bounded candidate buffer fills. It retains the strongest candidates in chronological order, so long or transient-dense files still produce slices after late Sample Start positions.
 - When the requested transient slice count is lower than the number of candidates, DrumCloud now chooses the strongest reasonably spaced attacks across the selected region, then restores chronological order. A dense cluster can no longer consume all available slices.
+- Detected transient positions are refined backwards in 1 ms energy blocks to the quiet edge immediately before the attack, preventing slice starts from landing inside waveform peaks.
 
 Future slicer editing: allow transient boundaries to be dragged on the waveform, add/remove markers manually, and persist the edited marker map with the plugin state.
 
