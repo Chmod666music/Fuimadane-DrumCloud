@@ -481,6 +481,7 @@ public:
 
     int getSliceMode() const noexcept { return fSliceMode; }
     int getSliceCount() const noexcept { return fSliceCount; }
+    float getSliceSensitivity() const noexcept { return fSliceSensitivity; }
     int getActiveSlice() const noexcept { return fActiveSlice; }
     void setSliceMode(float value) noexcept
     {
@@ -492,6 +493,12 @@ public:
     {
         fSliceCount = std::clamp(int(std::lround(value)), 2, 16);
         if (fActiveSlice >= fSliceCount) fActiveSlice = -1;
+        resetActiveVoicePlayback();
+    }
+    void setSliceSensitivity(float value) noexcept
+    {
+        fSliceSensitivity = std::clamp(value, 0.0f, 1.0f);
+        if (fActiveSlice >= getEffectiveSliceCount()) fActiveSlice = -1;
         resetActiveVoicePlayback();
     }
     void init(double sampleRate)
@@ -525,6 +532,7 @@ public:
         uint32_t sampleRate = 0;
         int length = 0;
         int32_t markers[64]{};
+        float markerStrengths[64]{};
         int markerCount = 0;
         int transientMarkerCount = 0;
         float waveMin[1024]{};
@@ -545,6 +553,7 @@ public:
         prepared->markerCount = scratch->markerCount;
         prepared->transientMarkerCount = scratch->transientMarkerCount;
         std::memcpy(prepared->markers, scratch->markers, sizeof(prepared->markers));
+        std::memcpy(prepared->markerStrengths, scratch->markerStrengths, sizeof(prepared->markerStrengths));
         std::memcpy(prepared->waveMin, scratch->waveMin, sizeof(prepared->waveMin));
         std::memcpy(prepared->waveMax, scratch->waveMax, sizeof(prepared->waveMax));
         prepared->pitch = detectSamplePitch(prepared->left.data(), prepared->right.data(),
@@ -567,6 +576,7 @@ public:
         markerCount = prepared.markerCount;
         transientMarkerCount = prepared.transientMarkerCount;
         std::memcpy(markers, prepared.markers, sizeof(markers));
+        std::memcpy(markerStrengths, prepared.markerStrengths, sizeof(markerStrengths));
         std::memcpy(waveMin, prepared.waveMin, sizeof(waveMin));
         std::memcpy(waveMax, prepared.waveMax, sizeof(waveMax));
     }
@@ -1229,8 +1239,24 @@ int getEffectiveSliceCount() const noexcept
 {
     if (fSliceMode == 0) return 0;
     if (fSliceMode == 1) return fSliceCount;
+    int32_t eligible[kMaxMarkers]{};
+    const int eligibleCount = copyEligibleTransientMarkers(eligible, kMaxMarkers);
     return DrumCloudSlicer::transientSliceCount(getRegionStartFrame(), getRegionEndFrame(),
-                                                markers, transientMarkerCount, fSliceCount);
+                                                eligible, eligibleCount, fSliceCount);
+}
+
+int copyEligibleTransientMarkers(int32_t* dst, int capacity) const noexcept
+{
+    if (dst == nullptr || capacity <= 0) return 0;
+    const float inverseSensitivity = 1.0f - fSliceSensitivity;
+    const float threshold = 0.0005f + 0.030f * inverseSensitivity * inverseSensitivity;
+    int count = 0;
+    for (int i = 0; i < transientMarkerCount && count < capacity; ++i)
+    {
+        if (i == 0 || markerStrengths[i] >= threshold)
+            dst[count++] = markers[i];
+    }
+    return count;
 }
 
 bool getVoiceRegionFrames(int note, int32_t& start, int32_t& end) const noexcept
@@ -1246,7 +1272,9 @@ bool getVoiceRegionFrames(int note, int32_t& start, int32_t& end) const noexcept
         DrumCloudSlicer::frameRange(start, end, slice, fSliceCount, start, end);
         return true;
     }
-    return DrumCloudSlicer::transientFrameRange(start, end, markers, transientMarkerCount,
+    int32_t eligible[kMaxMarkers]{};
+    const int eligibleCount = copyEligibleTransientMarkers(eligible, kMaxMarkers);
+    return DrumCloudSlicer::transientFrameRange(start, end, eligible, eligibleCount,
                                                 slice, fSliceCount, start, end);
 }
 
@@ -1267,8 +1295,10 @@ uint32_t copySliceBoundaries(float* dst, uint32_t capacity) const noexcept
     }
     else
     {
+        int32_t eligible[kMaxMarkers]{};
+        const int eligibleCount = copyEligibleTransientMarkers(eligible, kMaxMarkers);
         count = DrumCloudSlicer::buildTransientBoundaries(
-            getRegionStartFrame(), getRegionEndFrame(), markers, transientMarkerCount,
+            getRegionStartFrame(), getRegionEndFrame(), eligible, eligibleCount,
             fSliceCount, frames, std::min<int>(int(capacity), DrumCloudSlicer::kMaxSliceCount + 1));
     }
     for (int i = 0; i < count; ++i)
@@ -1628,7 +1658,7 @@ void makeMarkersFromSample()
 
     const float srMark = (sampleSR > 0) ? float(sampleSR) : sr;
     markerCount = DrumCloudTransients::detect(sampleL.data(), sampleR.data(), sampleLen,
-                                               srMark, markers, kMaxMarkers);
+                                               srMark, markers, kMaxMarkers, markerStrengths);
     transientMarkerCount = markerCount;
 
     // ✅ If we only have the forced "0" marker, add fallback grid markers.
@@ -1927,6 +1957,7 @@ private:
     int fPlaybackMode = kPlaybackLoop;
     int fSliceMode = 0;
     int fSliceCount = 8;
+    float fSliceSensitivity = 0.5f;
     int fActiveSlice = -1;
 
     static constexpr int kMaxLoop = 48000 * 4;
@@ -1970,6 +2001,7 @@ private:
 
     static constexpr int kMaxMarkers = 64;
     int32_t markers[kMaxMarkers]{};
+    float markerStrengths[kMaxMarkers]{};
     int markerCount = 0;
     int transientMarkerCount = 0;
 
@@ -2248,6 +2280,7 @@ float getParameterValue(uint32_t index) const override
     if (index == paramPlaybackMode) return fGran.getPlaybackMode();
     if (index == paramSliceMode) return float(fGran.getSliceMode());
     if (index == paramSliceCount) return float(fGran.getSliceCount());
+    if (index == paramSliceSensitivity) return fGran.getSliceSensitivity();
 
     return 0.0f;
 }
@@ -2408,6 +2441,10 @@ void setParameterValue(uint32_t index, float value) override
         fGran.setSliceCount(value);
         break;
 
+    case paramSliceSensitivity:
+        fGran.setSliceSensitivity(value);
+        break;
+
     default:
         break;
     }
@@ -2479,6 +2516,7 @@ void loadProgram(uint32_t index) override
             setParameterValue(paramPlaybackMode, 0.0f);
             setParameterValue(paramSliceMode, 0.0f);
             setParameterValue(paramSliceCount, 8.0f);
+            setParameterValue(paramSliceSensitivity, 0.5f);
         }
 }
 
@@ -2778,6 +2816,15 @@ void initParameter(uint32_t index, Parameter& parameter) override
         parameter.ranges.min = 2.0f;
         parameter.ranges.max = 16.0f;
         parameter.ranges.def = 8.0f;
+        break;
+
+    case paramSliceSensitivity:
+        parameter.name   = "Slice Sensitivity";
+        parameter.symbol = "slice_sensitivity";
+        parameter.unit   = "%";
+        parameter.ranges.min = 0.0f;
+        parameter.ranges.max = 1.0f;
+        parameter.ranges.def = 0.5f;
         break;
     }
 }
