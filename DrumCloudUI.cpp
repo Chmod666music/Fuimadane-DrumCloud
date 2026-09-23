@@ -885,6 +885,34 @@ void DrumCloudUI::onDisplay()
             glVertex2f(regionEndX, y0); glVertex2f(regionEndX, y1);
         glEnd();
 
+        // Compact grab handles make the region edges easy to catch without
+        // covering meaningful waveform detail. They remain attached to the
+        // marker lines at every UI scale.
+        constexpr float handleHalfWidth = 7.0f;
+        constexpr float handleHeight = 11.0f;
+        glColor4f(0.96f, 0.68f, 0.18f, 1.0f);
+        glBegin(GL_QUADS);
+            glVertex2f(regionStartX - handleHalfWidth, y0);
+            glVertex2f(regionStartX + handleHalfWidth, y0);
+            glVertex2f(regionStartX + handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionStartX - handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionEndX - handleHalfWidth, y0);
+            glVertex2f(regionEndX + handleHalfWidth, y0);
+            glVertex2f(regionEndX + handleHalfWidth, y0 + handleHeight);
+            glVertex2f(regionEndX - handleHalfWidth, y0 + handleHeight);
+        glEnd();
+        glColor4f(0.035f, 0.032f, 0.030f, 1.0f);
+        glBegin(GL_QUADS);
+            glVertex2f(regionStartX - 4.5f, y0 + 2.0f);
+            glVertex2f(regionStartX + 4.5f, y0 + 2.0f);
+            glVertex2f(regionStartX + 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionStartX - 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionEndX - 4.5f, y0 + 2.0f);
+            glVertex2f(regionEndX + 4.5f, y0 + 2.0f);
+            glVertex2f(regionEndX + 4.5f, y0 + handleHeight - 2.0f);
+            glVertex2f(regionEndX - 4.5f, y0 + handleHeight - 2.0f);
+        glEnd();
+
         const float startX = regionStartX + fStartPosUi * (regionEndX - regionStartX);
         const float halfW = 0.5f * fSpreadUi * (regionEndX - regionStartX);
         const float sx0 = std::max(regionStartX, startX - halfW);
@@ -1370,8 +1398,11 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
     const bool hitStartPosZone = hitWave && (my >= (wy1 - 16.0f) && my <= wy1);
     const float regionStartX = wx0 + fSampleStartUi * (wx1 - wx0);
     const float regionEndX = wx0 + fSampleEndUi * (wx1 - wx0);
-    const bool hitSampleStart = hitWave && std::fabs(mx - regionStartX) <= 7.0f;
-    const bool hitSampleEnd = hitWave && std::fabs(mx - regionEndX) <= 7.0f;
+    // Generous invisible hit areas around the thin marker lines prevent a
+    // near miss from falling through to the sample file chooser.
+    constexpr float sampleHandleHitRadius = 14.0f;
+    const bool hitSampleStart = hitWave && std::fabs(mx - regionStartX) <= sampleHandleHitRadius;
+    const bool hitSampleEnd = hitWave && std::fabs(mx - regionEndX) <= sampleHandleHitRadius;
 
     if (ev.button == 1 && ev.press)
     {
