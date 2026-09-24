@@ -1,6 +1,6 @@
 NAME = d_drumcloud
 FILES_DSP = SendNoteExamplePlugin.cpp AudioFileLoader.cpp PitchDetector.cpp FilteredStereoDelay.cpp
-FILES_UI = DrumCloudUI.cpp AudioFileLoader.cpp
+FILES_UI = DrumCloudUI.cpp AudioFileLoader.cpp ExternalUrl.cpp
 UI_TYPE = opengl
 CXXFLAGS += -std=gnu++17
 DPF_BUILD_DIR = $(CURDIR)/build/d_drumcloud

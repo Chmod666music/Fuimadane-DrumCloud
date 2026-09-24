@@ -85,6 +85,9 @@ for binary in "$clap_binary" "$vst3_binary"; do
 
     grep -aFq 'Fuimadane' "$binary"
     grep -aFq 'DrumCloud' "$binary"
+    # The website button must bypass host-provided web views in packaged builds.
+    grep -aFq 'xdg-open' "$binary"
+    grep -aFq 'gio' "$binary"
 done
 
 grep -aFq 'dk.fuimadane.drumcloud' "$clap_binary"
