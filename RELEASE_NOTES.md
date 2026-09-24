@@ -1,9 +1,18 @@
-# DrumCloud v1.9.0-beta.6
+# DrumCloud v1.9.0-beta.7
 
-This release keeps DrumCloud's browser behavior consistent between local test
-builds and packaged beta artifacts.
+This release fixes the missing Linux desktop-portal support in packaged beta
+artifacts.
 
-## Fixed in beta.6
+## Fixed in beta.7
+
+- Linux release builds now install the DBus development dependency required by
+  DPF's XDG Desktop Portal backend
+- REAPER VST3 sample selection now opens the desktop portal, matching the
+  verified local build instead of falling back to DPF's embedded file browser
+- Release validation inspects both CLAP and VST3 binaries for the portal backend
+  and their DBus linkage; a package without portal support can no longer publish
+
+## Included from beta.6
 
 - The new **FUIMADANE - OPEN WEBSITE** control opens the user's normal system
   browser instead of delegating the link to a DAW's embedded browser
