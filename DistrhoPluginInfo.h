@@ -24,6 +24,7 @@
 #define DISTRHO_PLUGIN_WANT_STATE       1
 #define DISTRHO_PLUGIN_WANT_FULL_STATE  1
 #define DISTRHO_PLUGIN_WANT_TIMEPOS     1
+#define DISTRHO_PLUGIN_WANT_DIRECT_ACCESS 1
 #define DISTRHO_PLUGIN_WANT_PARAMETER_VALUE_CHANGE_REQUEST 1
 
 // 👇 Her er den vigtige linje, der aktiverer Presets/Programs 👇
