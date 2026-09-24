@@ -3,6 +3,7 @@
 #include "DistrhoUI.hpp"
 #include "AudioFileLoader.hpp"
 #include "DrumCloudParams.hpp"
+#include "DrumCloudTelemetry.hpp"
 #include "ExternalUrl.hpp"
 
 #include <cstring>
@@ -200,6 +201,7 @@ public:
         // uses raw OpenGL coordinates.
         setGeometryConstraints(kDrumCloudUiMinWidth, kDrumCloudUiMinHeight,
                                true, false, false);
+        fTelemetry = getDrumCloudTelemetry(getPluginInstancePointer());
         fPreviewThread = std::thread([this]{ previewLoop(); });
     }
 
@@ -223,6 +225,7 @@ protected:
     void uiFileBrowserSelected(const char* filename) override;
 
 private:
+    DrumCloudTelemetry* fTelemetry = nullptr;
     static constexpr int kWavePreviewSize = 1024;
     float fWaveMin[kWavePreviewSize]{};
     float fWaveMax[kWavePreviewSize]{};
@@ -1358,8 +1361,8 @@ void DrumCloudUI::uiIdle()
         }
         repaint();
     }
-    const float scan = std::clamp(gDrumCloudUiScanPos.load(std::memory_order_relaxed), 0.0f, 1.0f);
-    const int activeSlice = gDrumCloudUiActiveSlice.load(std::memory_order_relaxed);
+    const float scan = std::clamp((fTelemetry ? fTelemetry->scanPos.load(std::memory_order_relaxed) : gDrumCloudUiScanPos.load(std::memory_order_relaxed)), 0.0f, 1.0f);
+    const int activeSlice = (fTelemetry ? fTelemetry->activeSlice.load(std::memory_order_relaxed) : gDrumCloudUiActiveSlice.load(std::memory_order_relaxed));
     if (activeSlice != fActiveSliceUi)
     {
         fActiveSliceUi = activeSlice;
@@ -1367,7 +1370,7 @@ void DrumCloudUI::uiIdle()
     }
     bool sliceBoundariesChanged = false;
     const uint32_t sliceBoundaryCount = std::min<uint32_t>(
-        gDrumCloudUiSliceBoundaryCount.load(std::memory_order_acquire), kUiSliceBoundaryCount);
+        (fTelemetry ? fTelemetry->sliceBoundaryCount.load(std::memory_order_acquire) : gDrumCloudUiSliceBoundaryCount.load(std::memory_order_acquire)), kUiSliceBoundaryCount);
     if (sliceBoundaryCount != fSliceBoundaryCountUi)
     {
         fSliceBoundaryCountUi = sliceBoundaryCount;
@@ -1376,7 +1379,7 @@ void DrumCloudUI::uiIdle()
     for (uint32_t i = 0; i < sliceBoundaryCount; ++i)
     {
         const float boundary = std::clamp(
-            gDrumCloudUiSliceBoundaries[i].load(std::memory_order_relaxed), 0.0f, 1.0f);
+            (fTelemetry ? fTelemetry->sliceBoundaries[i].load(std::memory_order_relaxed) : gDrumCloudUiSliceBoundaries[i].load(std::memory_order_relaxed)), 0.0f, 1.0f);
         if (std::fabs(boundary - fSliceBoundariesUi[i]) > 0.0005f)
         {
             fSliceBoundariesUi[i] = boundary;
@@ -1386,13 +1389,13 @@ void DrumCloudUI::uiIdle()
     if (sliceBoundariesChanged) repaint();
 
     const uint32_t detectedGeneration =
-        gDrumCloudDetectedPitchGeneration.load(std::memory_order_acquire);
+        (fTelemetry ? fTelemetry->pitchGeneration.load(std::memory_order_acquire) : gDrumCloudDetectedPitchGeneration.load(std::memory_order_acquire));
     if (detectedGeneration != fDetectedPitchGenerationUi)
     {
         fDetectedPitchGenerationUi = detectedGeneration;
-        fDetectedRootUi = gDrumCloudDetectedRoot.load(std::memory_order_relaxed);
-        fDetectedFineUi = gDrumCloudDetectedFine.load(std::memory_order_relaxed);
-        fDetectedConfidenceUi = gDrumCloudDetectedConfidence.load(std::memory_order_relaxed);
+        fDetectedRootUi = (fTelemetry ? fTelemetry->detectedRoot.load(std::memory_order_relaxed) : gDrumCloudDetectedRoot.load(std::memory_order_relaxed));
+        fDetectedFineUi = (fTelemetry ? fTelemetry->detectedFine.load(std::memory_order_relaxed) : gDrumCloudDetectedFine.load(std::memory_order_relaxed));
+        fDetectedConfidenceUi = (fTelemetry ? fTelemetry->detectedConfidence.load(std::memory_order_relaxed) : gDrumCloudDetectedConfidence.load(std::memory_order_relaxed));
 
         if (fAutoRootUi >= 0.5f && fDetectedRootUi >= 0 && fDetectedConfidenceUi >= 0.70f)
         {
@@ -1406,7 +1409,7 @@ void DrumCloudUI::uiIdle()
 
     bool grainChanged = false;
     const uint32_t grainCount = std::min<uint32_t>(
-        gDrumCloudUiGrainCount.load(std::memory_order_acquire), kUiGrainMarkerCount);
+        (fTelemetry ? fTelemetry->grainCount.load(std::memory_order_acquire) : gDrumCloudUiGrainCount.load(std::memory_order_acquire)), kUiGrainMarkerCount);
     if (grainCount != fGrainCountUI)
     {
         fGrainCountUI = grainCount;
@@ -1414,7 +1417,7 @@ void DrumCloudUI::uiIdle()
     }
     for (uint32_t i = 0; i < grainCount; ++i)
     {
-        const float pos = std::clamp(gDrumCloudUiGrainPos[i].load(std::memory_order_relaxed), 0.0f, 1.0f);
+        const float pos = std::clamp((fTelemetry ? fTelemetry->grainPos[i].load(std::memory_order_relaxed) : gDrumCloudUiGrainPos[i].load(std::memory_order_relaxed)), 0.0f, 1.0f);
         if (std::fabs(pos - fGrainPosUI[i]) > 0.0005f)
         {
             fGrainPosUI[i] = pos;
@@ -1585,6 +1588,19 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
         const uint32_t knobParam = knobAt(mx, my);
         if (knobParam != 0xffffffffu)
         {
+            // Delay mode has three discrete settings. A click advances one step;
+            // dragging previously needed 65px just to reach the next setting.
+            if (knobParam == paramDelayMode)
+            {
+                const float nextMode = float((int(std::lround(fDelayModeUi)) + 1) % 3);
+                editParameter(paramDelayMode, true);
+                setParamUiValue(paramDelayMode, nextMode);
+                setParameterValue(paramDelayMode, nextMode);
+                editParameter(paramDelayMode, false);
+                repaint();
+                return true;
+            }
+
             const auto now = std::chrono::steady_clock::now();
             const bool isDoubleClick = (fLastClickParam == knobParam) &&
                 (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);

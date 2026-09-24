@@ -129,6 +129,7 @@ struct CloudReverb {
 #include <cstdlib>   // getenv
 #include <atomic>
 #include "DrumCloudParams.hpp"
+#include "DrumCloudTelemetry.hpp"
 
 
 // ------------------------------------------------------------
@@ -2059,6 +2060,8 @@ enum DrumCloudStates {
 class SendNoteExamplePlugin : public Plugin
 {
 public:
+    DrumCloudTelemetry& uiTelemetry() noexcept { return fUiTelemetry; }
+
     SendNoteExamplePlugin()
     : Plugin(paramCount, 1, stateCount)
     {
@@ -2874,14 +2877,6 @@ void initParameter(uint32_t index, Parameter& parameter) override
       Initialize the audio port @a index.@n
       This function will be called once, shortly after the plugin is created.
     */
-    void initAudioPort(bool input, uint32_t index, AudioPort& port) override
-    {
-        // treat meter audio ports as stereo
-        port.groupId = kPortGroupMono;
-
-        // everything else is as default
-        Plugin::initAudioPort(input, index, port);
-    }
 
    /* --------------------------------------------------------------------------------------------------------
     * Audio/MIDI Processing */
@@ -2921,8 +2916,11 @@ void initParameter(uint32_t index, Parameter& parameter) override
 
             const bool confident = ready->pitch.valid && ready->pitch.confidence >= 0.70f;
             gDrumCloudDetectedRoot.store(confident ? ready->pitch.midiNote : -1, std::memory_order_relaxed);
+            fUiTelemetry.detectedRoot.store(confident ? ready->pitch.midiNote : -1, std::memory_order_relaxed);
             gDrumCloudDetectedFine.store(confident ? ready->pitch.fineTuneCents : 0.0f, std::memory_order_relaxed);
+            fUiTelemetry.detectedFine.store(confident ? ready->pitch.fineTuneCents : 0.0f, std::memory_order_relaxed);
             gDrumCloudDetectedConfidence.store(ready->pitch.confidence, std::memory_order_relaxed);
+            fUiTelemetry.detectedConfidence.store(ready->pitch.confidence, std::memory_order_relaxed);
 
             if (fAutoRoot && confident)
             {
@@ -2931,6 +2929,7 @@ void initParameter(uint32_t index, Parameter& parameter) override
             }
 
             gDrumCloudDetectedPitchGeneration.fetch_add(1, std::memory_order_release);
+            fUiTelemetry.pitchGeneration.fetch_add(1, std::memory_order_release);
             fRetired.store(ready, std::memory_order_release);
         }
     }
@@ -3022,19 +3021,30 @@ void initParameter(uint32_t index, Parameter& parameter) override
 
     // Send data til UI
     gDrumCloudUiScanPos.store(fGran.getScanPosNorm(), std::memory_order_relaxed);
+    fUiTelemetry.scanPos.store(fGran.getScanPosNorm(), std::memory_order_relaxed);
     gDrumCloudUiScanMode.store((int)std::lround(fGran.getScanMode()), std::memory_order_relaxed);
+    fUiTelemetry.scanMode.store((int)std::lround(fGran.getScanMode()), std::memory_order_relaxed);
     float grainPositions[kUiGrainMarkerCount]{};
     const uint32_t grainCount = fGran.copyActiveGrainPositions(grainPositions, kUiGrainMarkerCount);
     for (uint32_t i = 0; i < grainCount; ++i)
+    {
         gDrumCloudUiGrainPos[i].store(grainPositions[i], std::memory_order_relaxed);
+        fUiTelemetry.grainPos[i].store(grainPositions[i], std::memory_order_relaxed);
+    }
     gDrumCloudUiGrainCount.store(grainCount, std::memory_order_release);
+    fUiTelemetry.grainCount.store(grainCount, std::memory_order_release);
     gDrumCloudUiActiveSlice.store(fGran.getActiveSlice(), std::memory_order_relaxed);
+    fUiTelemetry.activeSlice.store(fGran.getActiveSlice(), std::memory_order_relaxed);
     float sliceBoundaries[kUiSliceBoundaryCount]{};
     const uint32_t sliceBoundaryCount = fGran.copySliceBoundaries(
         sliceBoundaries, kUiSliceBoundaryCount);
     for (uint32_t i = 0; i < sliceBoundaryCount; ++i)
+    {
         gDrumCloudUiSliceBoundaries[i].store(sliceBoundaries[i], std::memory_order_relaxed);
+        fUiTelemetry.sliceBoundaries[i].store(sliceBoundaries[i], std::memory_order_relaxed);
+    }
     gDrumCloudUiSliceBoundaryCount.store(sliceBoundaryCount, std::memory_order_release);
+    fUiTelemetry.sliceBoundaryCount.store(sliceBoundaryCount, std::memory_order_release);
 
     if (fScanMeterCountdown == 0)
     {
@@ -3081,6 +3091,7 @@ void initParameter(uint32_t index, Parameter& parameter) override
 
 
 private:
+    DrumCloudTelemetry fUiTelemetry;
     void workerLoop()
     {
         for (;;)
@@ -3161,6 +3172,13 @@ private:
     float fDelayDamping = 0.35f;
     FilteredStereoDelay m_delay;
 }; // <-- Slutningen af din Plugin-klasse
+
+DrumCloudTelemetry* getDrumCloudTelemetry(void* pluginInstance) noexcept
+{
+    return pluginInstance != nullptr
+        ? &static_cast<SendNoteExamplePlugin*>(pluginInstance)->uiTelemetry()
+        : nullptr;
+}
 
 
 
