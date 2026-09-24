@@ -1585,6 +1585,19 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
         const uint32_t knobParam = knobAt(mx, my);
         if (knobParam != 0xffffffffu)
         {
+            // Delay mode has three discrete settings. A click advances one step;
+            // dragging previously needed 65px just to reach the next setting.
+            if (knobParam == paramDelayMode)
+            {
+                const float nextMode = float((int(std::lround(fDelayModeUi)) + 1) % 3);
+                editParameter(paramDelayMode, true);
+                setParamUiValue(paramDelayMode, nextMode);
+                setParameterValue(paramDelayMode, nextMode);
+                editParameter(paramDelayMode, false);
+                repaint();
+                return true;
+            }
+
             const auto now = std::chrono::steady_clock::now();
             const bool isDoubleClick = (fLastClickParam == knobParam) &&
                 (std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastClickTime).count() < 300);
