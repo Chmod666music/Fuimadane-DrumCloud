@@ -2,7 +2,7 @@
 
 **Fuimadane DrumCloud** is a granular sample instrument built with the [DISTRHO Plugin Framework](https://github.com/DISTRHO/DPF). It loads WAV, FLAC and MP3 samples and turns them into a playable polyphonic cloud with pitch detection, sample regions, moving grain heads, time stretch, loop/one-shot/ping-pong playback, scan modes, filtered delay and output protection.
 
-The current public test build is [DrumCloud v1.9.0-beta.7](https://github.com/Chmod666music/Fuimadane-DrumCloud/releases/tag/v1.9.0-beta.7), with Linux CLAP/VST3, Windows CLAP/VST3 and universal macOS CLAP/VST3/AU packages. These unsigned builds are a pre-release and must be validated in real hosts before a stable release.
+The current public test build is [DrumCloud v1.9.0-beta.8](https://github.com/Chmod666music/Fuimadane-DrumCloud/releases/tag/v1.9.0-beta.8), with Linux CLAP/VST3, Windows CLAP/VST3 and universal macOS CLAP/VST3/AU packages. These unsigned builds are a pre-release and must be validated in real hosts before a stable release.
 
 ## Build from source
 
