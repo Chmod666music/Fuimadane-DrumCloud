@@ -3,6 +3,7 @@
 #include "DistrhoUI.hpp"
 #include "AudioFileLoader.hpp"
 #include "DrumCloudParams.hpp"
+#include "ExternalUrl.hpp"
 
 #include <cstring>
 #include <cstdio>
@@ -30,6 +31,7 @@ static constexpr float kDrumCloudUiWidth = 820.0f;
 static constexpr float kDrumCloudUiHeight = 740.0f;
 static constexpr uint kDrumCloudUiMinWidth = 615;
 static constexpr uint kDrumCloudUiMinHeight = 555;
+static constexpr const char* kFuimadaneUrl = "https://linktr.ee/Fuimadane";
 
 struct DrumCloudKnobSpec
 {
@@ -835,7 +837,7 @@ void DrumCloudUI::onDisplay()
     glColor4f(0.95f, 0.70f, 0.22f, 1.0f);
     drawPixelText("DRUMCLOUD", 18.0f, 15.0f, 2.0f);
     glColor4f(0.62f, 0.64f, 0.69f, 0.96f);
-    drawPixelText("FUIMADANE GRANULAR INSTRUMENT", 150.0f, 20.0f, 1.05f);
+    drawPixelText("FUIMADANE - OPEN WEBSITE", 150.0f, 20.0f, 1.05f);
     glColor4f(0.82f, 0.60f, 0.19f, 0.94f);
     drawPixelText("V1.9 BETA", W - 78.0f, 20.0f, 1.0f);
 
@@ -1453,6 +1455,12 @@ bool DrumCloudUI::onMouse(const MouseEvent& ev)
 
     if (ev.button == 1 && ev.press)
     {
+        if (mx >= 146.0f && mx <= 330.0f && my >= 12.0f && my <= 34.0f)
+        {
+            DrumCloud::openExternalUrl(kFuimadaneUrl);
+            return true;
+        }
+
         const float autoBx0 = 18.0f;
         const float autoBy0 = 52.0f;
         const float autoBw = 110.0f;
