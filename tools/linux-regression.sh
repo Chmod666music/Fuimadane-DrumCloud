@@ -7,12 +7,17 @@ trap 'rm -rf -- "$reg_tmp"' EXIT
 
 cd "$repo_root"
 
-for command_name in g++ ffmpeg file ldd readelf strings; do
+for command_name in g++ ffmpeg file ldd pkg-config readelf strings; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "Missing regression dependency: $command_name" >&2
         exit 1
     fi
 done
+
+if ! pkg-config --exists dbus-1; then
+    echo "Missing regression dependency: dbus-1 development files" >&2
+    exit 1
+fi
 
 echo "[1/4] Running native unit tests"
 ffmpeg -hide_banner -loglevel error \
@@ -92,6 +97,10 @@ for binary in "$clap_binary" "$vst3_binary"; do
     # The website button must bypass host-provided web views in packaged builds.
     grep -aFq 'xdg-open' "$binary"
     grep -aFq 'gio' "$binary"
+    # DPF only compiles its XDG Desktop Portal backend when DBus development
+    # files are present. Never publish a Linux artifact with that code missing.
+    grep -aFq 'org.freedesktop.portal.Desktop' "$binary"
+    ldd "$binary" | grep -Fq 'libdbus-1.so'
 done
 
 grep -aFq 'dk.fuimadane.drumcloud' "$clap_binary"
