@@ -2874,14 +2874,6 @@ void initParameter(uint32_t index, Parameter& parameter) override
       Initialize the audio port @a index.@n
       This function will be called once, shortly after the plugin is created.
     */
-    void initAudioPort(bool input, uint32_t index, AudioPort& port) override
-    {
-        // treat meter audio ports as stereo
-        port.groupId = kPortGroupMono;
-
-        // everything else is as default
-        Plugin::initAudioPort(input, index, port);
-    }
 
    /* --------------------------------------------------------------------------------------------------------
     * Audio/MIDI Processing */
