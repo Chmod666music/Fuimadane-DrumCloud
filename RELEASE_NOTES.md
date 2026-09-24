@@ -1,32 +1,26 @@
-# DrumCloud v1.9.0-beta.5
+# DrumCloud v1.9.0-beta.6
 
-This release supersedes beta.4 and completes the first transient-slicer
-milestone. Its slice placement and sample-browser workflow have been manually
-verified on Linux in REAPER.
+This release keeps DrumCloud's browser behavior consistent between local test
+builds and packaged beta artifacts.
 
-## Fixed and improved in beta.5
+## Fixed in beta.6
 
-- Fixed incorrect transient slices caused by marker positions and their
-  strength values becoming misaligned while duplicate markers were removed
-- Transient positions and strengths now remain paired through sorting and
-  compaction, so the strongest musical attacks select the correct boundaries
-- Slice candidates are ranked using both onset novelty and the actual event
-  peak, preventing tiny sharp clicks from outranking stronger hits
-- Attack positions are refined backwards from the selected event peak for
-  cleaner placement before the audible transient
-- Restored the host/native sample chooser in capable DAWs, with DPF's browser
-  retained as a fallback
-- Last-folder persistence remains active after selecting a sample
+- The new **FUIMADANE - OPEN WEBSITE** control opens the user's normal system
+  browser instead of delegating the link to a DAW's embedded browser
+- Linux launches website links with `xdg-open` and falls back to `gio open`
+- Windows uses the system URL handler and macOS uses the system `open` service
+- Sample selection continues to request the host/native file portal first;
+  DPF's bundled browser remains available only as a compatibility fallback
+- The release regression now verifies both the portal-first sample workflow and
+  the external Linux browser launchers inside CLAP and VST3 artifacts
 
-## Slicer and interface milestone
+## Included from beta.5
 
-- Equal and transient-detected MIDI slicing with 2–16 slices
-- Adjustable transient sensitivity and refined onset placement
-- MIDI note 36 and upward trigger consecutive slices at original sample pitch
-- Polyphonic slice playback with safe, independent grain boundaries
-- Waveform slice markers and active-slice highlighting
-- Resizable, HiDPI-aware interface with scaled drawing and pointer input
-- Clearer waveform layout plus easy-to-grab Sample Start/End handles
+- Improved transient slicing with correctly paired marker strengths
+- Stronger musical attacks are preferred over tiny sharp clicks
+- Refined transient placement before the audible attack
+- Remembered sample folders and portable WAV, FLAC and MP3 loading
+- Resizable, HiDPI-aware interface and polyphonic MIDI slicing
 
 ## Downloads
 
@@ -36,10 +30,10 @@ verified on Linux in REAPER.
 
 ## Validation status
 
-Manual Linux CLAP and VST3 testing passed, including sample loading, remembered
-folder behavior, transient placement and MIDI slice playback. Automated Linux,
-Windows and macOS builds pass. Windows and macOS packages remain beta builds
-that need testing in real hosts.
+The Linux CLAP and VST3 builds passed automated regression and were manually
+verified on Ubuntu Studio: sample selection opened the desktop portal, while
+the Fuimadane website opened in the normal system browser. Windows and macOS
+packages remain unsigned beta builds and need testing in real hosts.
 
 ## Beta warning
 

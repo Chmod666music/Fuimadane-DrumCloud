@@ -50,6 +50,10 @@ g++ -std=gnu++17 -O2 -Wall -Wextra tests/transient_detector.cpp -I. \
 "$reg_tmp/transient-detector-test"
 
 echo "[2/4] Building Linux CLAP and VST3"
+# Keep sample selection on the host/native portal path. The bundled DPF dialog
+# is intentionally only a fallback when a host cannot service file requests.
+grep -Fq 'fChoosingSample = requestStateFile("samplePath");' DrumCloudUI.cpp
+grep -Fq 'fChoosingSample = openFileBrowser(options);' DrumCloudUI.cpp
 ./build.sh
 
 clap_binary="$repo_root/bin/d_drumcloud.clap"
